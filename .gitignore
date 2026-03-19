@@ -1,0 +1,35 @@
+# 忽略大型文件
+*.pyc
+__pycache__/
+*.pyo
+.cache/
+
+# 忽略临时文件
+temp/*.json
+temp/*.md
+temp/*.csv
+temp/*.txt
+!temp/README.md
+
+# 忽略日志文件
+*.log
+logs/
+
+# 忽略系统文件
+.DS_Store
+Thumbs.db
+
+# 忽略敏感信息
+*.key
+*.secret
+.env
+
+# 但保留重要文档
+!系统文档/
+!系统备份/
+!MEMORY.md
+!USER.md
+!HEARTBEAT.md
+!SOUL.md
+!memory/
+!tools/

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "china-stock-analysis": {
+      "version": "1.0.0",
+      "installedAt": 1773581701525
+    },
+    "new-akshare-stock": {
+      "version": "1.0.0",
+      "installedAt": 1773581762213
+    },
+    "a-stock-trading-assistant": {
+      "version": "1.0.0",
+      "installedAt": 1773582362312
+    },
+    "quant-trading-system": {
+      "version": "6.0.0",
+      "installedAt": 1773583262325
+    },
+    "financial-analyst": {
+      "version": "1.0.0",
+      "installedAt": 1773584102180
+    },
+    "captcha-auto": {
+      "version": "1.0.7",
+      "installedAt": 1773634441123
+    }
+  }
+}

@@ -1,0 +1,405 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+智能股票分析系统
+根据当前时间自动判断使用盘中逻辑还是盘后逻辑
+"""
+
+import akshare as ak
+import pandas as pd
+from datetime import datetime, time
+import json
+import os
+import sys
+
+# ==================== 配置区 ====================
+
+HOLDINGS = [
+    {"code": "002828", "name": "贝肯能源", "cost": 14.850, "shares": 500},
+    {"code": "002342", "name": "巨力索具", "cost": 14.253, "shares": 900},
+]
+
+OUTPUT_DIR = "/home/admin/openclaw/workspace/temp/智能分析"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ==================== 时间判断逻辑 ====================
+
+def get_current_mode():
+    """根据当前时间判断分析模式"""
+    now = datetime.now()
+    current_time = now.time()
+    weekday = now.weekday()  # 0=周一，6=周日
+    
+    # 判断是否交易日 (简单判断：工作日)
+    is_trading_day = weekday < 5
+    
+    # 定义时间段
+    PRE_MARKET = time(9, 0)      # 9:00 前
+    CALL_AUCTION = time(9, 25)   # 9:25 集合竞价结束
+    MORNING_SESSION = time(11, 30)  # 11:30 上午收盘
+    AFTERNOON_SESSION = time(13, 0)  # 13:00 下午开盘
+    MARKET_CLOSE = time(15, 0)   # 15:00 收盘
+    EVENING = time(20, 0)        # 20:00 晚间
+    
+    if not is_trading_day:
+        return {
+            "mode": "盘后复盘",
+            "description": "非交易日，使用盘后复盘逻辑",
+            "actions": ["日 K 线分析", "形态识别", "周计划制定"]
+        }
+    
+    if current_time < PRE_MARKET:
+        return {
+            "mode": "盘前准备",
+            "description": "盘前时段，使用盘后数据准备预案",
+            "actions": ["日 K 线分析", "形态识别", "盘前预案"]
+        }
+    
+    elif current_time < CALL_AUCTION:
+        return {
+            "mode": "集合竞价前",
+            "description": "集合竞价前，准备观察要点",
+            "actions": ["昨日回顾", "集合竞价观察要点", "预警位设置"]
+        }
+    
+    elif current_time < MORNING_SESSION:
+        return {
+            "mode": "盘中监控 (早盘)",
+            "description": "早盘交易时段，使用盘中实时监控逻辑",
+            "actions": ["实时数据", "分时图战法", "资金流向", "盘中选股", "预警监控"]
+        }
+    
+    elif current_time < AFTERNOON_SESSION:
+        return {
+            "mode": "午间休市",
+            "description": "午间休市，使用盘中数据复盘上午",
+            "actions": ["上午复盘", "午后预案", "选股池更新"]
+        }
+    
+    elif current_time < MARKET_CLOSE:
+        return {
+            "mode": "盘中监控 (午后)",
+            "description": "午后交易时段，使用盘中实时监控逻辑",
+            "actions": ["实时数据", "分时图战法", "资金流向", "涨停潜力", "尾盘决策"]
+        }
+    
+    elif current_time < EVENING:
+        return {
+            "mode": "盘后分析 (傍晚)",
+            "description": "收盘后，使用盘后分析逻辑",
+            "actions": ["日 K 线分析", "涨停质量", "资金流向", "形态识别", "次日预案"]
+        }
+    
+    else:
+        return {
+            "mode": "盘后复盘 (晚间)",
+            "description": "晚间复盘时段，使用盘后深度分析逻辑",
+            "actions": ["深度复盘", "龙虎榜", "次日策略", "周计划"]
+        }
+
+def format_mode_info(mode_info):
+    """格式化模式信息"""
+    return f"""
+⏰ 当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+📊 分析模式：{mode_info['mode']}
+📝 说明：{mode_info['description']}
+📋 分析内容：{', '.join(mode_info['actions'])}
+"""
+
+# ==================== 盘后分析逻辑 ====================
+
+def post_market_analysis():
+    """盘后分析 (日 K 线、形态识别、次日预案)"""
+    print("=" * 70)
+    print("📊 盘后分析系统")
+    print(f"分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 70)
+    
+    results = []
+    
+    for stock in HOLDINGS:
+        code = stock["code"]
+        name = stock["name"]
+        cost = stock["cost"]
+        shares = stock["shares"]
+        
+        print(f"\n{'='*70}")
+        print(f"📈 {name} ({code})")
+        print(f"{'='*70}")
+        
+        # 获取日 K 线数据
+        try:
+            df = ak.stock_zh_a_hist(symbol=code, period="daily", start_date="20251001", adjust="qfq")
+            if len(df) < 20:
+                print("  数据不足，跳过分析")
+                continue
+            
+            latest = df.iloc[-1]
+            close = latest['收盘']
+            change = latest['涨跌幅']
+            
+            # 基础数据
+            position_value = close * shares
+            profit = (close - cost) * shares
+            profit_pct = ((close - cost) / cost) * 100
+            
+            print(f"\n【基础数据】")
+            print(f"  收盘价：{close} 元 ({change}%)")
+            print(f"  持仓盈亏：{profit:+.2f} 元 ({profit_pct:+.2f}%)")
+            
+            # 技术指标
+            ma5 = df['收盘'].rolling(5).mean().iloc[-1]
+            ma10 = df['收盘'].rolling(10).mean().iloc[-1]
+            ma20 = df['收盘'].rolling(20).mean().iloc[-1]
+            
+            print(f"\n【技术指标】")
+            print(f"  MA5: {ma5:.2f}")
+            print(f"  MA10: {ma10:.2f}")
+            print(f"  MA20: {ma20:.2f}")
+            
+            if ma5 > ma10 > ma20:
+                print(f"  均线排列：🟢 多头排列")
+            elif ma5 < ma10 < ma20:
+                print(f"  均线排列：🔴 空头排列")
+            else:
+                print(f"  均线排列：🟡 纠缠震荡")
+            
+            # 形态识别
+            print(f"\n【形态识别】")
+            
+            # 涨停判断
+            is_limit_up = change >= 9.5
+            if is_limit_up:
+                print(f"  🔥 涨停板")
+            
+            # 五日线首阴判断
+            prev_change = df.iloc[-2]['涨跌幅'] if len(df) > 1 else 0
+            if prev_change > 0 and -5 <= change < 0 and close >= ma5 * 0.98:
+                print(f"  🟡 五日线首阴形态")
+            
+            # 连续上涨判断
+            consecutive_gains = 0
+            for i in range(1, min(6, len(df))):
+                if df.iloc[-i]['涨跌幅'] > 0:
+                    consecutive_gains += 1
+                else:
+                    break
+            
+            if consecutive_gains >= 3:
+                print(f"  🟢 {consecutive_gains}连阳")
+            
+            # 次日预案
+            print(f"\n【次日预案】")
+            if is_limit_up:
+                print(f"  涨停后预案:")
+                print(f"    IF 高开 5-8% → 持有观望")
+                print(f"    IF 高开>8% → 持有，冲高止盈")
+                print(f"    IF 低开 → 反抽卖出")
+            elif change > 5:
+                print(f"  大涨后预案:")
+                print(f"    IF 高开 → 持有")
+                print(f"    IF 平开 → 观察")
+                print(f"    IF 低开 → 减仓")
+            else:
+                print(f"  正常走势预案:")
+                print(f"    IF 高开 → 持有")
+                print(f"    IF 低开 → 观察支撑")
+            
+            results.append({
+                "code": code,
+                "name": name,
+                "close": close,
+                "change": change,
+                "profit": profit,
+                "profit_pct": profit_pct,
+                "is_limit_up": is_limit_up,
+            })
+            
+        except Exception as e:
+            print(f"分析失败：{e}")
+    
+    print(f"\n{'='*70}")
+    print("盘后分析完成")
+    print("=" * 70)
+    
+    return results
+
+# ==================== 盘中监控逻辑 ====================
+
+def intraday_monitoring():
+    """盘中监控 (实时数据、分时图、选股)"""
+    print("=" * 70)
+    print("🔍 盘中实时监控系统")
+    print(f"监控时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 70)
+    
+    # 获取市场情绪
+    print("\n📊 获取市场数据...")
+    try:
+        df = ak.stock_market_activity_legu()
+        if not df.empty:
+            up = df[df['类型'] == '上涨']['数量'].values[0] if len(df[df['类型'] == '上涨']) > 0 else 0
+            down = df[df['类型'] == '下跌']['数量'].values[0] if len(df[df['类型'] == '下跌']) > 0 else 0
+            print(f"  涨跌比：{up}:{down}")
+    except:
+        print("  市场情绪数据获取失败")
+    
+    results = []
+    
+    for stock in HOLDINGS:
+        code = stock["code"]
+        name = stock["name"]
+        cost = stock["cost"]
+        shares = stock["shares"]
+        
+        print(f"\n{'='*70}")
+        print(f"📈 {name} ({code})")
+        print(f"{'='*70}")
+        
+        # 获取实时数据
+        try:
+            df = ak.stock_zh_a_spot_em()
+            stock_data = df[df['代码'] == code]
+            if stock_data.empty:
+                print("  数据获取失败，跳过")
+                continue
+            
+            row = stock_data.iloc[0]
+            price = float(row.get('最新价', 0))
+            change = float(row.get('涨跌幅', 0))
+            open_price = float(row.get('今开', 0))
+            high = float(row.get('最高', 0))
+            low = float(row.get('最低', 0))
+            
+            # 基础数据
+            position_value = price * shares
+            profit = (price - cost) * shares
+            profit_pct = ((price - cost) / cost) * 100
+            
+            print(f"\n【实时数据】")
+            print(f"  现价：{price} 元 ({change}%)")
+            print(f"  开盘：{open_price} 元")
+            print(f"  最高：{high} 元")
+            print(f"  最低：{low} 元")
+            print(f"  持仓盈亏：{profit:+.2f} 元 ({profit_pct:+.2f}%)")
+            
+            # 分时图战法
+            print(f"\n🔥【分时图战法】")
+            estimated_vwap = (open_price + high + low + price) / 4
+            price_vs_vwap = ((price - estimated_vwap) / estimated_vwap * 100) if estimated_vwap > 0 else 0
+            
+            # 评分
+            score = 0
+            if price > estimated_vwap * 1.01:
+                score += 30
+            elif price > estimated_vwap:
+                score += 20
+            
+            change_from_open = (price - open_price) / open_price * 100 if open_price > 0 else 0
+            if change_from_open > 3:
+                score += 25
+            elif change_from_open > 2:
+                score += 20
+            elif change_from_open > 0:
+                score += 10
+            
+            if change > 7:
+                score += 10
+            elif change > 5:
+                score += 8
+            elif change > 3:
+                score += 6
+            elif change > 0:
+                score += 4
+            
+            if score >= 85:
+                rating = "🟢🟢🟢 极强"
+                action = "积极买入/持有"
+                probability = "涨停概率 70%+"
+            elif score >= 70:
+                rating = "🟢🟢 强势"
+                action = "持有/加仓"
+                probability = "大涨概率 60%+"
+            elif score >= 55:
+                rating = "🟡 中性"
+                action = "观望"
+                probability = "震荡为主"
+            else:
+                rating = "🔴 弱势"
+                action = "卖出/空仓"
+                probability = "下跌风险"
+            
+            print(f"  形态评级：{rating}")
+            print(f"  形态评分：{score}/100")
+            print(f"  概率预测：{probability}")
+            print(f"  操作建议：{action}")
+            print(f"  分时均线：{estimated_vwap:.2f} 元")
+            print(f"  股价位置：{price_vs_vwap:+.1f}% (相对于均线)")
+            
+            # 预警
+            print(f"\n⚠️【预警】")
+            if change <= -8:
+                print(f"  🔴🔴🔴 一级预警：跌超 -8%，立即止损！")
+            elif change <= -5:
+                print(f"  🔴🔴 二级预警：跌超 -5%，反抽卖出！")
+            elif change >= 9.5:
+                print(f"  🟢 机会预警：已涨停，持有观察封单！")
+            elif change >= 5:
+                print(f"  🟢 机会预警：大涨超 5%，持有！")
+            else:
+                print(f"  ✅ 无预警，走势正常")
+            
+            results.append({
+                "code": code,
+                "name": name,
+                "price": price,
+                "change": change,
+                "score": score,
+                "rating": rating,
+            })
+            
+        except Exception as e:
+            print(f"监控失败：{e}")
+    
+    print(f"\n{'='*70}")
+    print("盘中监控完成")
+    print("=" * 70)
+    
+    return results
+
+# ==================== 主程序 ====================
+
+def main():
+    """主程序：根据时间自动选择分析模式"""
+    
+    # 获取当前模式
+    mode_info = get_current_mode()
+    
+    # 打印模式信息
+    print(format_mode_info(mode_info))
+    
+    # 根据模式选择分析逻辑
+    mode = mode_info['mode']
+    
+    if "盘中" in mode:
+        # 盘中监控逻辑
+        results = intraday_monitoring()
+    else:
+        # 盘后分析逻辑
+        results = post_market_analysis()
+    
+    # 保存结果
+    report_path = os.path.join(OUTPUT_DIR, f"分析报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(report_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "timestamp": datetime.now().isoformat(),
+            "mode": mode_info,
+            "results": results,
+        }, f, ensure_ascii=False, indent=2)
+    
+    print(f"\n📁 报告已保存：{report_path}")
+    
+    return results
+
+if __name__ == "__main__":
+    main()

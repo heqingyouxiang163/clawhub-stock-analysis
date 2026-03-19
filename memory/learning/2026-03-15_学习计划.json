@@ -1,0 +1,82 @@
+{
+  "date": "2026-03-15",
+  "tasks": [
+    {
+      "time": "15:30-17:00",
+      "task": "盘后自动复盘",
+      "content": [
+        "分析当日所有涨停股",
+        "记录连板股特征",
+        "统计涨跌停家数",
+        "分析资金流向",
+        "更新情绪周期",
+        "记录失败案例"
+      ],
+      "output": "learning/2026-03-15_复盘.md",
+      "status": "pending"
+    },
+    {
+      "time": "17:00-18:00",
+      "task": "龙虎榜学习",
+      "content": [
+        "分析游资席位动向",
+        "记录机构买入股",
+        "学习主力操盘手法",
+        "更新龙头股池"
+      ],
+      "output": "learning/2026-03-15_龙虎榜.md",
+      "status": "pending"
+    },
+    {
+      "time": "19:00-20:00",
+      "task": "消息面整理",
+      "content": [
+        "收集政策利好",
+        "整理行业热点",
+        "分析公司公告",
+        "更新题材库"
+      ],
+      "output": "learning/2026-03-15_消息面.md",
+      "status": "pending"
+    },
+    {
+      "time": "20:00-21:00",
+      "task": "选股公式优化",
+      "content": [
+        "回测当日选股效果",
+        "优化评分权重",
+        "更新选股条件",
+        "测试新策略"
+      ],
+      "output": "learning/2026-03-15_公式优化.md",
+      "status": "pending"
+    },
+    {
+      "time": "21:00-22:00",
+      "task": "交割单学习",
+      "content": [
+        "收集实盘大赛数据",
+        "分析高手操作",
+        "学习新手法",
+        "集成到系统"
+      ],
+      "output": "learning/2026-03-15_交割单.md",
+      "status": "pending"
+    }
+  ],
+  "daily_goal": {
+    "target_stocks": 50,
+    "target_patterns": 5,
+    "target_cases": 10
+  },
+  "weekly_goal": {
+    "target_return": "6.7%",
+    "target_winrate": "65%",
+    "target_profit_loss": "2.5:1"
+  },
+  "monthly_goal": {
+    "target_return": "30%",
+    "total_trades": 60,
+    "max_drawdown": "10%"
+  }
+}

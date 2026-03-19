@@ -1,0 +1,10 @@
+{
+  "name": "tencent-stock-rank",
+  "version": "1.0.0",
+  "description": "基于腾讯财经 API 的 A 股实时涨幅榜查询技能",
+  "author": "小艺·炒股龙虾",
+  "license": "MIT",
+  "tags": ["stock", "a-share", "realtime", "tencent"],
+  "dependencies": ["requests", "redis"],
+  "main": "tencent_stock_rank.py"
+}
