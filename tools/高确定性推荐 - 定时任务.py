@@ -134,20 +134,28 @@ class HighProbRecommender:
             'reasons': reasons
         }
     
-    def recommend(self, min_score=75, top_n=3):
-        """推荐股票"""
+    def recommend(self, min_score=75, top_n=5):
+        """推荐股票 - 优化版 (并发获取)"""
         watchlist = self.fetch_realtime_watchlist()
         
+        # 并发获取数据 (10 线程)
+        import concurrent.futures
         candidates = []
-        for code in watchlist:
-            result = self.analyze_stock(code)
-            if result:
-                candidates.append(result)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_code = {executor.submit(self.analyze_stock, code): code for code in watchlist}
+            for future in concurrent.futures.as_completed(future_to_code, timeout=30):
+                try:
+                    result = future.result()
+                    if result:
+                        candidates.append(result)
+                except Exception as e:
+                    pass
         
         # 排序
         candidates.sort(key=lambda x: x['score'], reverse=True)
         
-        # 筛选
+        # 筛选 - 只输出最强的前 5 名
         self.recommendations = [s for s in candidates if s['score'] >= min_score][:top_n]
         
         return self.recommendations

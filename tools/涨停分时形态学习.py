@@ -265,14 +265,11 @@ def save_morphology_stats(history):
     # 显示总耗时
     total_elapsed = time.time() - total_start
     if total_elapsed < 1:
-        print(f"
-✅ **总耗时**: {total_elapsed*1000:.0f}ms")
+        print(f"✅ **总耗时**: {total_elapsed*1000:.0f}ms")
     elif total_elapsed < 60:
-        print(f"
-✅ **总耗时**: {total_elapsed:.1f}秒")
+        print(f"✅ **总耗时**: {total_elapsed:.1f}秒")
     else:
-        print(f"
-✅ **总耗时**: {total_elapsed/60:.1f}分钟")
+        print(f"✅ **总耗时**: {total_elapsed/60:.1f}分钟")
 
 if __name__ == "__main__":
     total_start = time.time()  # 记录总开始时间

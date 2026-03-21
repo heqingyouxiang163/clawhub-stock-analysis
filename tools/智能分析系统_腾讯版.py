@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
 from 腾讯财经_API import get_multiple_stocks, get_single_stock
 from datetime import datetime, time
+import time as time_module
 import json
 import os
 
@@ -191,5 +192,5 @@ def main():
 
 
 if __name__ == "__main__":
-    total_start = time.time()  # 记录总开始时间
+    total_start = time_module.time()  # 记录总开始时间
     main()

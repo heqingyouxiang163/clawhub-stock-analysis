@@ -7,10 +7,11 @@
 
 import akshare as ak
 import pandas as pd
-from datetime import datetime, time
+from datetime import datetime, time as dt_time
 import json
 import os
 import sys
+import time
 
 # ==================== 配置区 ====================
 
@@ -34,12 +35,12 @@ def get_current_mode():
     is_trading_day = weekday < 5
     
     # 定义时间段
-    PRE_MARKET = time(9, 0)      # 9:00 前
-    CALL_AUCTION = time(9, 25)   # 9:25 集合竞价结束
-    MORNING_SESSION = time(11, 30)  # 11:30 上午收盘
-    AFTERNOON_SESSION = time(13, 0)  # 13:00 下午开盘
-    MARKET_CLOSE = time(15, 0)   # 15:00 收盘
-    EVENING = time(20, 0)        # 20:00 晚间
+    PRE_MARKET = dt_time(9, 0)      # 9:00 前
+    CALL_AUCTION = dt_time(9, 25)   # 9:25 集合竞价结束
+    MORNING_SESSION = dt_time(11, 30)  # 11:30 上午收盘
+    AFTERNOON_SESSION = dt_time(13, 0)  # 13:00 下午开盘
+    MARKET_CLOSE = dt_time(15, 0)   # 15:00 收盘
+    EVENING = dt_time(20, 0)        # 20:00 晚间
     
     if not is_trading_day:
         return {
@@ -235,14 +236,20 @@ def intraday_monitoring():
     
     # 获取市场情绪
     print("\n📊 获取市场数据...")
-    try:
-        df = ak.stock_market_activity_legu()
-        if not df.empty:
-            up = df[df['类型'] == '上涨']['数量'].values[0] if len(df[df['类型'] == '上涨']) > 0 else 0
-            down = df[df['类型'] == '下跌']['数量'].values[0] if len(df[df['类型'] == '下跌']) > 0 else 0
-            print(f"  涨跌比：{up}:{down}")
-    except:
-        print("  市场情绪数据获取失败")
+    for retry in range(3):
+        try:
+            df = ak.stock_market_activity_legu()
+            if not df.empty:
+                up = df[df['类型'] == '上涨']['数量'].values[0] if len(df[df['类型'] == '上涨']) > 0 else 0
+                down = df[df['类型'] == '下跌']['数量'].values[0] if len(df[df['类型'] == '下跌']) > 0 else 0
+                print(f"  涨跌比：{up}:{down}")
+                break
+        except Exception as e:
+            if retry < 2:
+                print(f"  重试中... ({retry+1}/3)")
+                time.sleep(2)
+            else:
+                print("  市场情绪数据获取失败")
     
     results = []
     
@@ -256,111 +263,118 @@ def intraday_monitoring():
         print(f"📈 {name} ({code})")
         print(f"{'='*70}")
         
-        # 获取实时数据
-        try:
-            df = ak.stock_zh_a_spot_em()
-            stock_data = df[df['代码'] == code]
-            if stock_data.empty:
-                print("  数据获取失败，跳过")
-                continue
-            
-            row = stock_data.iloc[0]
-            price = float(row.get('最新价', 0))
-            change = float(row.get('涨跌幅', 0))
-            open_price = float(row.get('今开', 0))
-            high = float(row.get('最高', 0))
-            low = float(row.get('最低', 0))
-            
-            # 基础数据
-            position_value = price * shares
-            profit = (price - cost) * shares
-            profit_pct = ((price - cost) / cost) * 100
-            
-            print(f"\n【实时数据】")
-            print(f"  现价：{price} 元 ({change}%)")
-            print(f"  开盘：{open_price} 元")
-            print(f"  最高：{high} 元")
-            print(f"  最低：{low} 元")
-            print(f"  持仓盈亏：{profit:+.2f} 元 ({profit_pct:+.2f}%)")
-            
-            # 分时图战法
-            print(f"\n🔥【分时图战法】")
-            estimated_vwap = (open_price + high + low + price) / 4
-            price_vs_vwap = ((price - estimated_vwap) / estimated_vwap * 100) if estimated_vwap > 0 else 0
-            
-            # 评分
-            score = 0
-            if price > estimated_vwap * 1.01:
-                score += 30
-            elif price > estimated_vwap:
-                score += 20
-            
-            change_from_open = (price - open_price) / open_price * 100 if open_price > 0 else 0
-            if change_from_open > 3:
-                score += 25
-            elif change_from_open > 2:
-                score += 20
-            elif change_from_open > 0:
-                score += 10
-            
-            if change > 7:
-                score += 10
-            elif change > 5:
-                score += 8
-            elif change > 3:
-                score += 6
-            elif change > 0:
-                score += 4
-            
-            if score >= 85:
-                rating = "🟢🟢🟢 极强"
-                action = "积极买入/持有"
-                probability = "涨停概率 70%+"
-            elif score >= 70:
-                rating = "🟢🟢 强势"
-                action = "持有/加仓"
-                probability = "大涨概率 60%+"
-            elif score >= 55:
-                rating = "🟡 中性"
-                action = "观望"
-                probability = "震荡为主"
-            else:
-                rating = "🔴 弱势"
-                action = "卖出/空仓"
-                probability = "下跌风险"
-            
-            print(f"  形态评级：{rating}")
-            print(f"  形态评分：{score}/100")
-            print(f"  概率预测：{probability}")
-            print(f"  操作建议：{action}")
-            print(f"  分时均线：{estimated_vwap:.2f} 元")
-            print(f"  股价位置：{price_vs_vwap:+.1f}% (相对于均线)")
-            
-            # 预警
-            print(f"\n⚠️【预警】")
-            if change <= -8:
-                print(f"  🔴🔴🔴 一级预警：跌超 -8%，立即止损！")
-            elif change <= -5:
-                print(f"  🔴🔴 二级预警：跌超 -5%，反抽卖出！")
-            elif change >= 9.5:
-                print(f"  🟢 机会预警：已涨停，持有观察封单！")
-            elif change >= 5:
-                print(f"  🟢 机会预警：大涨超 5%，持有！")
-            else:
-                print(f"  ✅ 无预警，走势正常")
-            
-            results.append({
-                "code": code,
-                "name": name,
-                "price": price,
-                "change": change,
-                "score": score,
-                "rating": rating,
-            })
-            
-        except Exception as e:
-            print(f"监控失败：{e}")
-    
+        # 获取实时数据（带重试）
+        stock_data = None
+        for retry in range(3):
+            try:
+                df = ak.stock_zh_a_spot_em()
+                stock_data = df[df['代码'] == code]
+                if not stock_data.empty:
+                    break
+            except Exception as e:
+                if retry < 2:
+                    time.sleep(2)
+                else:
+                    print(f"  数据获取失败：{e}")
+        
+        if stock_data is None or stock_data.empty:
+            print("  数据获取失败，跳过")
+            continue
+        
+        row = stock_data.iloc[0]
+        price = float(row.get('最新价', 0))
+        change = float(row.get('涨跌幅', 0))
+        open_price = float(row.get('今开', 0))
+        high = float(row.get('最高', 0))
+        low = float(row.get('最低', 0))
+        
+        # 基础数据
+        position_value = price * shares
+        profit = (price - cost) * shares
+        profit_pct = ((price - cost) / cost) * 100
+        
+        print(f"\n【实时数据】")
+        print(f"  现价：{price} 元 ({change}%)")
+        print(f"  开盘：{open_price} 元")
+        print(f"  最高：{high} 元")
+        print(f"  最低：{low} 元")
+        print(f"  持仓盈亏：{profit:+.2f} 元 ({profit_pct:+.2f}%)")
+        
+        # 分时图战法
+        print(f"\n🔥【分时图战法】")
+        estimated_vwap = (open_price + high + low + price) / 4
+        price_vs_vwap = ((price - estimated_vwap) / estimated_vwap * 100) if estimated_vwap > 0 else 0
+        
+        # 评分
+        score = 0
+        if price > estimated_vwap * 1.01:
+            score += 30
+        elif price > estimated_vwap:
+            score += 20
+        
+        change_from_open = (price - open_price) / open_price * 100 if open_price > 0 else 0
+        if change_from_open > 3:
+            score += 25
+        elif change_from_open > 2:
+            score += 20
+        elif change_from_open > 0:
+            score += 10
+        
+        if change > 7:
+            score += 10
+        elif change > 5:
+            score += 8
+        elif change > 3:
+            score += 6
+        elif change > 0:
+            score += 4
+        
+        if score >= 85:
+            rating = "🟢🟢🟢 极强"
+            action = "积极买入/持有"
+            probability = "涨停概率 70%+"
+        elif score >= 70:
+            rating = "🟢🟢 强势"
+            action = "持有/加仓"
+            probability = "大涨概率 60%+"
+        elif score >= 55:
+            rating = "🟡 中性"
+            action = "观望"
+            probability = "震荡为主"
+        else:
+            rating = "🔴 弱势"
+            action = "卖出/空仓"
+            probability = "下跌风险"
+        
+        print(f"  形态评级：{rating}")
+        print(f"  形态评分：{score}/100")
+        print(f"  概率预测：{probability}")
+        print(f"  操作建议：{action}")
+        print(f"  分时均线：{estimated_vwap:.2f} 元")
+        print(f"  股价位置：{price_vs_vwap:+.1f}% (相对于均线)")
+        
+        # 预警
+        print(f"\n⚠️【预警】")
+        if change <= -8:
+            print(f"  🔴🔴🔴 一级预警：跌超 -8%，立即止损！")
+        elif change <= -5:
+            print(f"  🔴🔴 二级预警：跌超 -5%，反抽卖出！")
+        elif change >= 9.5:
+            print(f"  🟢 机会预警：已涨停，持有观察封单！")
+        elif change >= 5:
+            print(f"  🟢 机会预警：大涨超 5%，持有！")
+        else:
+            print(f"  ✅ 无预警，走势正常")
+        
+        results.append({
+            "code": code,
+            "name": name,
+            "price": price,
+            "change": change,
+            "score": score,
+            "rating": rating,
+        })
+        
     print(f"\n{'='*70}")
     print("盘中监控完成")
     print("=" * 70)

@@ -1,0 +1,461 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+3 分钟实时监控模块
+支持双数据源 (腾讯财经 + 东方财富)，用于盘中高频获取实时股票数据
+"""
+
+import requests
+import time
+import json
+import os
+import threading
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Dict, Optional, Callable
+
+
+# ==================== 配置区 ====================
+
+# 缓存配置
+CACHE_DIR = "/home/admin/openclaw/workspace/temp"
+CACHE_FILE = os.path.join(CACHE_DIR, "realtime_cache.json")
+CACHE_TTL = 180  # 3 分钟
+
+# 腾讯财经 API
+TENCENT_API = "http://qt.gtimg.cn/q={}"
+
+# 东方财富 API
+EM_API = "https://push2.eastmoney.com/api/qt/clist/get"
+
+# 股票池 (腾讯财经覆盖的重点股票)
+STOCK_POOL = [
+    # 涨停热点
+    'sh600569', 'sh600643', 'sh600370', 'sh603929', 'sh603248',
+    'sh600545', 'sh600227', 'sh600683', 'sh600302', 'sh603738',
+    'sz000890', 'sz002427', 'sz002278', 'sz002724', 'sz001278',
+    # 5-8% 主升浪
+    'sz002995', 'sz002730', 'sz000717', 'sz002175', 'sh603093',
+    # 沪深 300 核心
+    'sh600036', 'sh601318', 'sh600519', 'sh600030', 'sh601398',
+    'sh601288', 'sh600000', 'sh600887', 'sh601166', 'sh600048',
+    'sh601328', 'sh600276', 'sh601857', 'sh601088', 'sh600028',
+    'sh600031', 'sh601988', 'sh600585', 'sh600016', 'sh601390',
+    'sz000333', 'sz002415', 'sz000651', 'sz000858', 'sz002594',
+    'sz000001', 'sz000002', 'sz002466', 'sz002460', 'sz002469',
+    # 用户持仓 (示例)
+    'sz002342', 'sh603778', 'sz002828',
+]
+
+# 监控状态
+_monitoring_state = {
+    'active': False,
+    'thread': None,
+    'codes': [],
+    'interval': 180,
+    'callback': None,
+    'last_update': None,
+}
+
+
+# ==================== 工具函数 ====================
+
+def code_to_symbol(code: str) -> str:
+    """股票代码转腾讯格式 (002828 -> sz002828)"""
+    code = str(code).zfill(6)
+    if code.startswith('6'):
+        return f"sh{code}"
+    else:
+        return f"sz{code}"
+
+
+def ensure_cache_dir():
+    """确保缓存目录存在"""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+
+
+# ==================== 腾讯财经接口 ====================
+
+def fetch_tencent_data(codes: List[str]) -> Dict[str, Dict]:
+    """
+    从腾讯财经获取股票数据
+    
+    Args:
+        codes: 股票代码列表 (如 ['002828', '603778'])
+    
+    Returns:
+        dict: {代码：数据字典}
+    """
+    if not codes:
+        return {}
+    
+    # 转腾讯格式
+    symbols = [code_to_symbol(c) for c in codes]
+    code_list = ','.join(symbols[:150])  # 最多 150 只
+    
+    url = TENCENT_API.format(code_list)
+    headers = {'Referer': 'https://stockapp.finance.qq.com/'}
+    
+    try:
+        start = time.time()
+        response = requests.get(url, headers=headers, timeout=8)
+        elapsed = time.time() - start
+        
+        if response.status_code != 200:
+            print(f"⚠️ 腾讯财经 HTTP {response.status_code}")
+            return {}
+        
+        text = response.content.decode('gbk')
+        lines = text.strip().split(';')
+        
+        result = {}
+        for line in lines:
+            if '=' in line:
+                parts = line.split('=')
+                if len(parts) >= 2:
+                    data = parts[1].strip('"').split('~')
+                    if len(data) >= 32:
+                        code = data[2] if len(data) > 2 else ''
+                        name = data[1] if len(data) > 1 else ''
+                        current = float(data[3]) if len(data) > 3 and data[3] else 0
+                        prev_close = float(data[4]) if len(data) > 4 and data[4] else current
+                        change_pct = float(data[32]) if len(data) > 32 else 0
+                        amount = float(data[37]) if len(data) > 37 else 0
+                        turnover = float(data[39]) if len(data) > 39 else 0
+                        
+                        result[code] = {
+                            'code': code,
+                            'name': name,
+                            'current': current,
+                            'prev_close': prev_close,
+                            'change_pct': change_pct,
+                            'amount': amount,
+                            'turnover': turnover,
+                            'elapsed': elapsed,
+                            'success': True,
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+        
+        return result
+        
+    except Exception as e:
+        print(f"⚠️ 腾讯财经失败：{str(e)[:50]}")
+        return {}
+
+
+def get_realtime_data(codes: List[str]) -> List[Dict]:
+    """
+    获取实时数据 (腾讯财经快速模式)
+    
+    Args:
+        codes: 股票代码列表
+    
+    Returns:
+        list: 股票数据列表
+    """
+    data = fetch_tencent_data(codes)
+    return list(data.values())
+
+
+# ==================== 东方财富接口 ====================
+
+def fetch_em_rank_batch(page: int = 1, page_size: int = 500) -> List[Dict]:
+    """东方财富获取单页涨幅排名"""
+    params = {
+        'pn': page,
+        'pz': page_size,
+        'po': 1,
+        'np': 1,
+        'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
+        'fltt': 2,
+        'invt': 2,
+        'fid': 'f3',
+        'fs': 'm:0+m:1',
+        'fields': 'f12,f14,f3'
+    }
+    
+    try:
+        resp = requests.get(EM_API, params=params, timeout=10,
+                           headers={'User-Agent': 'Mozilla/5.0'})
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('data') and data['data'].get('diff'):
+                return data['data']['diff']
+    except Exception as e:
+        print(f"⚠️ 东方财富失败：{str(e)[:40]}")
+    
+    return []
+
+
+def get_em_full_rank() -> List[Dict]:
+    """东方财富获取全市场涨幅排名"""
+    print("📊 东方财富 - 获取涨幅排名...")
+    start = time.time()
+    
+    all_stocks = []
+    
+    for page in range(1, 20):
+        stocks = fetch_em_rank_batch(page)
+        
+        if not stocks:
+            break
+        
+        for s in stocks:
+            code = s.get('f12', '')
+            name = s.get('f14', '')
+            change_pct = s.get('f3', 0)
+            
+            if code and name:
+                all_stocks.append({
+                    'code': code,
+                    'name': name,
+                    'change_pct': change_pct
+                })
+        
+        if len(stocks) < 500:
+            break
+        
+        time.sleep(0.2)
+    
+    elapsed = time.time() - start
+    print(f"✅ 获取{len(all_stocks)}只股票排名，耗时{elapsed:.1f}秒")
+    
+    return all_stocks
+
+
+# ==================== 数据合并与缓存 ====================
+
+def merge_data(em_stocks: List[Dict], tc_prices: Dict[str, Dict]) -> List[Dict]:
+    """合并东方财富排名和腾讯财经价格"""
+    merged = []
+    
+    for s in em_stocks:
+        code = s['code']
+        
+        if code in tc_prices:
+            p = tc_prices[code]
+            merged.append({
+                'code': code,
+                'name': p['name'],
+                'current': p['current'],
+                'change_pct': p['change_pct'],
+                'open': p.get('open', 0),
+                'high': p.get('high', 0),
+                'low': p.get('low', 0),
+                'prev_close': p.get('prev_close', 0),
+                'amount': p.get('amount', 0),
+                'turnover': p.get('turnover', 0),
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        else:
+            merged.append({
+                'code': code,
+                'name': s['name'],
+                'current': 0,
+                'change_pct': s['change_pct']
+            })
+    
+    merged.sort(key=lambda x: x['change_pct'], reverse=True)
+    return merged
+
+
+def load_cache() -> Optional[List[Dict]]:
+    """加载缓存"""
+    try:
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if time.time() - data.get('timestamp', 0) < CACHE_TTL:
+                    return data.get('stocks', [])
+    except:
+        pass
+    return None
+
+
+def save_cache(stocks: List[Dict]):
+    """保存缓存"""
+    try:
+        ensure_cache_dir()
+        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({
+                'timestamp': time.time(),
+                'stocks': stocks
+            }, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ 保存缓存失败：{e}")
+
+
+# ==================== 主接口 ====================
+
+def get_full_market_scan(use_cache: bool = True) -> List[Dict]:
+    """
+    全市场扫描 (东方财富 + 腾讯财经)
+    
+    Args:
+        use_cache: 是否使用缓存
+    
+    Returns:
+        list: 股票数据列表
+    """
+    if use_cache:
+        cached = load_cache()
+        if cached:
+            print(f"✅ 使用缓存 ({len(cached)}只)")
+            return cached
+    
+    print("=" * 75)
+    print("🦞 全市场扫描 - 东方财富 + 腾讯财经")
+    print(f"时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 75)
+    print()
+    
+    # 东方财富获取排名
+    em_stocks = get_em_full_rank()
+    print()
+    
+    # 腾讯财经获取价格
+    codes = [s['code'] for s in em_stocks]
+    print("📊 腾讯财经 - 获取价格数据...")
+    tc_prices = fetch_tencent_data(codes)
+    print(f"✅ 获取{len(tc_prices)}只价格数据")
+    print()
+    
+    # 合并数据
+    merged = merge_data(em_stocks, tc_prices)
+    
+    # 保存缓存
+    save_cache(merged)
+    
+    print("=" * 75)
+    print(f"📊 扫描完成：{len(merged)}只")
+    print("=" * 75)
+    
+    return merged
+
+
+def get_stocks_in_range(min_pct: float, max_pct: float, use_cache: bool = True) -> List[Dict]:
+    """获取指定涨幅范围的股票"""
+    stocks = get_full_market_scan(use_cache=use_cache)
+    result = [s for s in stocks if min_pct <= s['change_pct'] <= max_pct and s['current'] > 0]
+    result.sort(key=lambda x: x['change_pct'], reverse=True)
+    return result
+
+
+def get_limit_up_stocks(use_cache: bool = True) -> List[Dict]:
+    """获取涨停股 (涨幅≥9.5%)"""
+    stocks = get_full_market_scan(use_cache=use_cache)
+    result = [s for s in stocks if s['change_pct'] >= 9.5 and s['current'] > 0]
+    result.sort(key=lambda x: x['change_pct'], reverse=True)
+    return result
+
+
+# ==================== 定时监控 ====================
+
+def _monitor_loop():
+    """监控循环"""
+    while _monitoring_state['active']:
+        try:
+            codes = _monitoring_state['codes']
+            callback = _monitoring_state['callback']
+            
+            # 获取数据
+            data = get_realtime_data(codes)
+            
+            # 调用回调
+            if callback:
+                callback({
+                    'stocks': data,
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'count': len(data)
+                })
+            
+            _monitoring_state['last_update'] = datetime.now()
+            
+            # 等待下一次
+            time.sleep(_monitoring_state['interval'])
+            
+        except Exception as e:
+            print(f"⚠️ 监控错误：{str(e)[:50]}")
+            time.sleep(10)
+
+
+def start_monitoring(interval: int = 180, codes: List[str] = None, 
+                     callback: Callable = None):
+    """
+    启动定时监控
+    
+    Args:
+        interval: 监控间隔 (秒)，默认 180 秒 (3 分钟)
+        codes: 监控股票列表
+        callback: 数据更新回调函数
+    """
+    if _monitoring_state['active']:
+        print("⚠️ 监控已在运行")
+        return
+    
+    if not codes:
+        print("⚠️ 请指定监控股票列表")
+        return
+    
+    _monitoring_state['active'] = True
+    _monitoring_state['codes'] = codes
+    _monitoring_state['interval'] = interval
+    _monitoring_state['callback'] = callback
+    
+    thread = threading.Thread(target=_monitor_loop, daemon=True)
+    thread.start()
+    _monitoring_state['thread'] = thread
+    
+    print(f"✅ 监控已启动：{len(codes)}只股票，每{interval}秒更新一次")
+
+
+def stop_monitoring():
+    """停止定时监控"""
+    _monitoring_state['active'] = False
+    _monitoring_state['thread'] = None
+    print("✅ 监控已停止")
+
+
+def get_monitoring_status() -> Dict:
+    """获取监控状态"""
+    return {
+        'active': _monitoring_state['active'],
+        'codes': _monitoring_state['codes'],
+        'interval': _monitoring_state['interval'],
+        'last_update': _monitoring_state['last_update']
+    }
+
+
+# ==================== 测试 ====================
+
+if __name__ == "__main__":
+    print("=" * 75)
+    print("🦞 3 分钟实时监控 - 测试")
+    print("=" * 75)
+    print()
+    
+    # 测试 1: 快速查询
+    print("1. 测试快速查询 (腾讯财经):")
+    codes = ['002342', '603778', '002828']
+    data = get_realtime_data(codes)
+    for s in data:
+        print(f"   {s['code']} {s['name']}: ¥{s['current']:.2f} ({s['change_pct']:+.1f}%)")
+    print()
+    
+    # 测试 2: 全市场扫描
+    print("2. 测试全市场扫描:")
+    stocks = get_full_market_scan(use_cache=False)
+    print(f"   获取{len(stocks)}只股票")
+    print()
+    
+    # 测试 3: 筛选主升浪
+    print("3. 测试筛选主升浪 (5-8%):")
+    rising = get_stocks_in_range(5, 8)
+    print(f"   找到{len(rising)}只")
+    for s in rising[:10]:
+        print(f"   {s['code']} {s['name']}: +{s['change_pct']:.1f}%")
+    print()
+    
+    print("=" * 75)
+    print("✅ 测试完成")
+    print("=" * 75)

@@ -11,6 +11,8 @@ import subprocess
 from datetime import datetime
 import os
 
+# 性能监控：使用 time.time() 计算真实耗时
+
 
 # ==================== 配置区 ====================
 
@@ -399,13 +401,14 @@ def send_message(text):
 
 
 def main():
-    total_start = datetime.now()  # 记录总开始时间
+    total_start = time.time()  # 记录总开始时间 (使用 time.time() 计算真实耗时)
+    start_datetime = datetime.now()  # 用于显示的时间戳
     
     # 发送开始通知
     start_msg = f"""
 🦞 **定时任务监控开始**
 
-**开始时间**: {start_time.strftime('%Y-%m-%d %H:%M:%S')}
+**开始时间**: {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}
 **检查内容**: 25 个定时任务
 **执行频率**: 每 5 分钟一次
 """
@@ -414,7 +417,7 @@ def main():
     
     print("=" * 75)
     print("🦞 定时任务全自动化监控 v2.0")
-    print(f"时间：{start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"时间：{start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 75)
     print()
     
@@ -474,14 +477,15 @@ def main():
     print("=" * 75)
     
     # 发送结束通知
-    end_time = datetime.now()  # 记录总结束时间
-    duration = (end_time - total_start).total_seconds()  # 计算总耗时
+    end_time_unix = time.time()  # 记录总结束时间 (unix 时间戳)
+    end_datetime = datetime.now()  # 用于显示的时间戳
+    duration = end_time_unix - total_start  # 计算真实耗时 (秒)
     # 简化汇报：只报告问题
-if issues:
-    end_msg = f"""
+    if issues:
+        end_msg = f"""
 🦞 **定时任务监控完成**
 
-**结束时间**: {end_time.strftime('%Y-%m-%d %H:%M:%S')}
+**结束时间**: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}
 **执行耗时**: {duration:.1f}秒
 
 **检查结果**:
@@ -491,12 +495,12 @@ if issues:
 
 **下次检查**: 4 小时后 (自动)
 """
-else:
-    # 无问题时不发送详细汇报
-    end_msg = f"""
+    else:
+        # 无问题时不发送详细汇报
+        end_msg = f"""
 🦞 **定时任务监控完成**
 
-**结束时间**: {end_time.strftime('%Y-%m-%d %H:%M:%S')}
+**结束时间**: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}
 **执行耗时**: {duration:.1f}秒
 **系统状态**: ✅ 全部正常
 

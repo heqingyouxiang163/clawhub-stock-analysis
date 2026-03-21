@@ -376,7 +376,8 @@ def main():
     print(f"✅ 找到{len(target_range)}只")
     
     # 生成推荐报告
-    generate_recommendation_report(stocks, target_range)
+    high_quality_preview = get_high_quality_stocks(target_range, RECOMMEND_SCORE)
+    generate_recommendation_report(stocks, target_range, high_quality_preview)
     
     # 返回结果 (用于定时任务)
     high_quality = get_high_quality_stocks(target_range, RECOMMEND_SCORE)

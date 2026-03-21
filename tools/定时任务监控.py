@@ -1,230 +1,194 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-定时任务自动化监控脚本
-用途：检查任务执行情况，发现问题自动修复
+定时任务实时监控工具
+每 5 分钟检查一次修复任务的执行状态
 """
 
 import json
 import subprocess
 import time
 from datetime import datetime
-import os
+from typing import List, Dict
 
 
-LOG_FILE = "/home/admin/openclaw/workspace/memory/自我进化/定时任务心跳日志.md"
-CRON_STATUS_FILE = "/home/admin/openclaw/workspace/temp/cron_status.json"
+# 监控的任务列表
+MONITORED_TASKS = [
+    "316140a6-44ad-4a6c-9c11-8a889af6e02a",  # 集合竞价监控
+    "f5e618b8-df3f-4105-8b5a-894c8be5e46d",  # 智能分析 -9 点 25
+    "79f2f858-898c-4079-badd-4df3e8616247",  # 盘中监控 -14 点
+    "ce73ef9b-4bd3-4a88-8706-a2cc904e42e0",  # 智能分析 -14 点
+    "b26c6b35-5754-4a7d-bb26-c4a2064396aa",  # 涨停形态每日学习
+    "5b179d3f-d374-4cff-84eb-891a6b92c718",  # 龙虎榜分析
+    "a7cf3986-ab67-47a3-b4e7-d9710627187e",  # 自我学习升级
+]
+
+TASK_NAMES = {
+    "316140a6-44ad-4a6c-9c11-8a889af6e02a": "集合竞价监控",
+    "f5e618b8-df3f-4105-8b5a-894c8be5e46d": "智能分析 -9:25",
+    "79f2f858-898c-4079-badd-4df3e8616247": "盘中监控 -14 点",
+    "ce73ef9b-4bd3-4a88-8706-a2cc904e42e0": "智能分析 -14 点",
+    "b26c6b35-5754-4a7d-bb26-c4a2064396aa": "涨停形态学习",
+    "5b179d3f-d374-4cff-84eb-891a6b92c718": "龙虎榜分析",
+    "a7cf3986-ab67-47a3-b4e7-d9710627187e": "自我学习升级",
+}
+
+LOG_FILE = "/home/admin/openclaw/workspace/temp/定时任务监控日志.md"
 
 
-def check_cron_status():
-    """检查 cron 调度器状态"""
+def get_cron_status() -> List[Dict]:
+    """获取 cron 任务状态"""
     try:
         result = subprocess.run(
-            ["openclaw", "cron", "status"],
+            ["openclaw", "cron", "list", "--json"],
             capture_output=True,
             text=True,
             timeout=30
         )
-        return result.returncode == 0
-    except:
-        return False
-
-
-def get_cron_jobs():
-    """获取所有 cron 任务"""
-    # 直接从文件读取（避免命令行解析问题）
-    status_file = "/home/admin/openclaw/workspace/temp/cron_status.json"
-    try:
-        if os.path.exists(status_file):
-            with open(status_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except:
-        pass
-    
-    # 返回 None 表示需要从 cron 获取
-    return None
-
-
-def check_job_health(jobs):
-    """检查任务健康状态"""
-    issues = []
-    
-    for job in jobs.get('jobs', []):
-        job_id = job.get('id', '')
-        job_name = job.get('name', '')
-        state = job.get('state', {})
-        
-        # 检查错误
-        if state.get('consecutiveErrors', 0) > 0:
-            issues.append({
-                'type': 'error',
-                'job_id': job_id,
-                'job_name': job_name,
-                'error': state.get('lastError', 'Unknown')
-            })
-        
-        # 检查超时
-        last_duration = state.get('lastDurationMs', 0)
-        if last_duration > 300000:  # 5 分钟
-            issues.append({
-                'type': 'timeout',
-                'job_id': job_id,
-                'job_name': job_name,
-                'duration': last_duration / 1000
-            })
-        
-        # 检查消息发送失败
-        if state.get('lastDeliveryStatus') == 'failed':
-            issues.append({
-                'type': 'message_failed',
-                'job_id': job_id,
-                'job_name': job_name
-            })
-    
-    return issues
-
-
-def auto_fix_issues(issues):
-    """自动修复问题"""
-    fixed = []
-    
-    for issue in issues:
-        job_id = issue['job_id']
-        job_name = issue['job_name']
-        issue_type = issue['type']
-        
-        print(f"🔧 尝试修复：{job_name} ({issue_type})")
-        
-        # 超时任务：增加超时时间
-        if issue_type == 'timeout':
-            print(f"  → 建议：增加 timeoutSeconds 参数")
-            fixed.append(job_id)
-        
-        # 消息失败：重试
-        elif issue_type == 'message_failed':
-            print(f"  → 尝试重新运行任务...")
-            try:
-                subprocess.run(
-                    ["openclaw", "cron", "run", job_id],
-                    capture_output=True,
-                    timeout=30
-                )
-                print(f"  → 已重试")
-                fixed.append(job_id)
-            except:
-                print(f"  → 重试失败")
-        
-        # 错误：记录日志
-        elif issue_type == 'error':
-            print(f"  → 错误：{issue.get('error', 'Unknown')}")
-            print(f"  → 建议：检查脚本或数据源")
-    
-    return fixed
-
-
-def update_log(issues, fixed):
-    """更新心跳日志"""
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    log_entry = f"\n### {timestamp}\n"
-    log_entry += f"- 检查任务：19 个\n"
-    log_entry += f"- 发现问题：{len(issues)}个\n"
-    log_entry += f"- 自动修复：{len(fixed)}个\n"
-    
-    if issues:
-        log_entry += "\n问题列表:\n"
-        for issue in issues:
-            status = "✅ 已修复" if issue['job_id'] in fixed else "⚠️ 待修复"
-            log_entry += f"- {issue['job_name']}: {issue['type']} {status}\n"
-    
-    try:
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(log_entry)
+        data = json.loads(result.stdout)
+        return data.get('jobs', [])
     except Exception as e:
-        print(f"⚠️ 更新日志失败：{e}")
+        print(f"❌ 获取任务状态失败：{e}")
+        return []
+
+
+def check_tasks(jobs: List[Dict]) -> Dict[str, Dict]:
+    """检查任务状态"""
+    status = {}
+    
+    for job in jobs:
+        job_id = job.get('id', '')
+        if job_id in MONITORED_TASKS:
+            state = job.get('state', {})
+            payload = job.get('payload', {})
+            
+            status[job_id] = {
+                'name': TASK_NAMES.get(job_id, job.get('name', 'Unknown')),
+                'enabled': job.get('enabled', False),
+                'timeout': payload.get('timeoutSeconds', 0),
+                'last_error': state.get('lastError', '无'),
+                'consecutive_errors': state.get('consecutiveErrors', 0),
+                'last_status': state.get('lastRunStatus', '未知'),
+                'next_run': state.get('nextRunAtMs', 0),
+            }
+    
+    return status
+
+
+def generate_report(status: Dict[str, Dict]) -> str:
+    """生成监控报告"""
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    report = []
+    report.append("=" * 80)
+    report.append(f"📊 定时任务监控报告 - {now}")
+    report.append("=" * 80)
+    report.append("")
+    
+    # 统计
+    total = len(status)
+    enabled = sum(1 for s in status.values() if s['enabled'])
+    has_errors = sum(1 for s in status.values() if s['consecutive_errors'] > 0)
+    
+    report.append(f"📋 监控任务：{total}个")
+    report.append(f"✅ 已启用：{enabled}个")
+    report.append(f"⚠️ 有错误：{has_errors}个")
+    report.append("")
+    report.append("-" * 80)
+    report.append("")
+    
+    # 详细状态
+    for job_id, info in status.items():
+        emoji = "✅" if info['enabled'] and info['consecutive_errors'] == 0 else "⚠️"
+        
+        report.append(f"{emoji} {info['name']}")
+        report.append(f"   状态：{'✅ 已启用' if info['enabled'] else '❌ 已禁用'}")
+        report.append(f"   超时：{info['timeout']}秒")
+        report.append(f"   最后状态：{info['last_status']}")
+        report.append(f"   连续错误：{info['consecutive_errors']}次")
+        
+        if info['last_error'] and info['last_error'] != '无':
+            error_short = info['last_error'][:50] + "..." if len(info['last_error']) > 50 else info['last_error']
+            report.append(f"   最后错误：{error_short}")
+        
+        if info['next_run'] > 0:
+            next_run = datetime.fromtimestamp(info['next_run'] / 1000).strftime('%Y-%m-%d %H:%M')
+            report.append(f"   下次执行：{next_run}")
+        
+        report.append("")
+    
+    report.append("-" * 80)
+    report.append("")
+    
+    # 建议
+    if has_errors > 0:
+        report.append("⚠️ 发现错误，建议:")
+        report.append("   1. 检查脚本是否正常")
+        report.append("   2. 增加超时时间")
+        report.append("   3. 手动触发测试")
+        report.append("")
+    else:
+        report.append("✅ 所有任务状态正常")
+        report.append("")
+    
+    report.append("=" * 80)
+    
+    return "\n".join(report)
+
+
+def save_report(report: str):
+    """保存报告"""
+    with open(LOG_FILE, 'a', encoding='utf-8') as f:
+        f.write(f"\n---\n{report}\n")
 
 
 def main():
-    print("=" * 75)
-    print("🦞 定时任务自动化监控")
-    print(f"时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 75)
+    """主函数"""
+    print("=" * 80)
+    print("🔍 定时任务实时监控")
+    print("=" * 80)
     print()
     
-    # 检查 cron 状态
-    print("📊 检查 cron 调度器...")
-    if check_cron_status():
-        print("✅ cron 调度器正常")
-    else:
-        print("❌ cron 调度器异常")
-        return
-    
-    print()
-    
-    # 获取任务列表
-    print("📊 获取任务列表...")
-    jobs = get_cron_jobs()
+    # 获取状态
+    print("📊 获取任务状态...")
+    jobs = get_cron_status()
     
     if not jobs:
-        print("❌ 获取任务列表失败")
+        print("❌ 无法获取任务状态")
         return
     
-    print(f"✅ 获取到 {jobs.get('total', 0)}个任务")
+    print(f"✅ 获取到{len(jobs)}个任务")
     print()
     
-    # 检查健康状态
-    print("📊 检查任务健康状态...")
-    issues = check_job_health(jobs)
+    # 检查任务
+    print("🔍 检查监控任务...")
+    status = check_tasks(jobs)
     
-    if issues:
-        print(f"⚠️ 发现{len(issues)}个问题")
-        for issue in issues:
-            print(f"  - {issue['job_name']}: {issue['type']}")
-    else:
-        print("✅ 所有任务正常")
+    if not status:
+        print("❌ 未找到监控任务")
+        return
     
+    print(f"✅ 检查{len(status)}个任务")
     print()
     
-    # 自动修复
-    if issues:
-        print("🔧 开始自动修复...")
-        fixed = auto_fix_issues(issues)
-        print(f"✅ 修复{len(fixed)}个问题")
+    # 生成报告
+    report = generate_report(status)
+    
+    # 打印报告
+    print(report)
+    
+    # 保存报告
+    save_report(report)
+    
+    print(f"📝 报告已保存：{LOG_FILE}")
+    
+    # 告警
+    has_errors = sum(1 for s in status.values() if s['consecutive_errors'] > 0)
+    if has_errors > 0:
         print()
-        
-        # 更新日志
-        update_log(issues, fixed)
-    
-    # 保存状态
-    try:
-        os.makedirs(os.path.dirname(CRON_STATUS_FILE), exist_ok=True)
-        with open(CRON_STATUS_FILE, 'w', encoding='utf-8') as f:
-            json.dump({
-                'timestamp': time.time(),
-                'total_jobs': jobs.get('total', 0),
-                'issues': len(issues),
-                'fixed': len(fixed) if issues else 0
-            }, f, ensure_ascii=False, indent=2)
-    except:
-        pass
-    
-    print("=" * 75)
-    print("✅ 监控完成")
-    print("=" * 75)
+        print(f"🚨 警告：{has_errors}个任务有错误！")
+        print("   建议执行：bash /home/admin/openclaw/workspace/tools/深度修复定时任务.sh")
 
-
-    # 显示总耗时
-    total_elapsed = time.time() - total_start
-    if total_elapsed < 1:
-        print(f"
-✅ **总耗时**: {total_elapsed*1000:.0f}ms")
-    elif total_elapsed < 60:
-        print(f"
-✅ **总耗时**: {total_elapsed:.1f}秒")
-    else:
-        print(f"
-✅ **总耗时**: {total_elapsed/60:.1f}分钟")
 
 if __name__ == "__main__":
-    total_start = time.time()  # 记录总开始时间
     main()
