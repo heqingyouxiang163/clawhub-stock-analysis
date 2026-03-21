@@ -480,13 +480,22 @@ def main():
     end_time_unix = time.time()  # 记录总结束时间 (unix 时间戳)
     end_datetime = datetime.now()  # 用于显示的时间戳
     duration = end_time_unix - total_start  # 计算真实耗时 (秒)
+    
+    # 根据耗时选择显示精度
+    if duration < 1:
+        duration_str = f"{duration*1000:.0f}毫秒"
+    elif duration < 60:
+        duration_str = f"{duration:.2f}秒"
+    else:
+        duration_str = f"{duration:.1f}秒"
+    
     # 简化汇报：只报告问题
     if issues:
         end_msg = f"""
 🦞 **定时任务监控完成**
 
 **结束时间**: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}
-**执行耗时**: {duration:.1f}秒
+**执行耗时**: {duration_str}
 
 **检查结果**:
 - ✅ 健康：{len(healthy)}个
@@ -501,7 +510,7 @@ def main():
 🦞 **定时任务监控完成**
 
 **结束时间**: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}
-**执行耗时**: {duration:.1f}秒
+**执行耗时**: {duration_str}
 **系统状态**: ✅ 全部正常
 
 **下次检查**: 4 小时后 (自动)
