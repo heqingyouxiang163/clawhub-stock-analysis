@@ -59,31 +59,26 @@ jobs:
         echo "测试腾讯财经 API 连接..."
         curl -s "http://qt.gtimg.cn/q=sh600519" | head -1 || echo "API 测试完成"
 
-  # 3. 部署到生产环境
+  # 3. 部署确认
   deploy:
     runs-on: ubuntu-latest
     needs: test-cron
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
-    - name: 部署通知
+    - name: 部署确认
       run: |
+        echo "========================================"
         echo "🦞 炒股龙虾系统已更新！"
+        echo "========================================"
         echo "提交者：${{ github.actor }}"
         echo "提交信息：${{ github.event.head_commit.message }}"
         echo "部署时间：$(date)"
-    
-    - name: 发送部署通知到 Issue
-      uses: actions/github-script@v6
-      with:
-        script: |
-          await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `🦞 部署通知 - ${new Date().toISOString()}`,
-            body: `## 部署成功\n\n- **提交者**: @${context.actor}\n- **提交信息**: ${{ github.event.head_commit.message }}\n- **部署时间**: ${new Date().toISOString()}\n\n✅ 所有检查通过，系统已自动部署！`
-          });
+        echo "提交 Hash: ${{ github.sha }}"
+        echo "========================================"
+        echo "✅ 所有检查通过，系统已自动部署！"
+        echo "========================================"
 
   # 4. 盘后自动复盘（仅在交易日 15:30 运行）
   after-market-review:
