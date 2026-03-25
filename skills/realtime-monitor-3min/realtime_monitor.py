@@ -112,9 +112,31 @@ STOCK_POOL_V2 = [
     'sz002179', 'sz002230', 'sz002241', 'sz002252', 'sz002271',
     'sz002304', 'sz002311', 'sz002326', 'sz002340', 'sz002352',
     
-    # === 用户持仓 (固定) ===
-    'sz002342', 'sh603778', 'sz002828',
+    # === 用户持仓 (从配置文件动态加载) ===
+    # 注：实际使用时从 /home/admin/openclaw/workspace/tools/持仓配置.py 读取
 ]
+
+# 动态持仓列表 (运行时加载)
+_DYNAMIC_HOLDINGS = []
+
+def load_user_holdings():
+    """动态加载用户持仓"""
+    global _DYNAMIC_HOLDINGS
+    try:
+        import sys
+        sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+        from 持仓配置 import HOLDINGS
+        _DYNAMIC_HOLDINGS = []
+        for h in HOLDINGS:
+            code = h['code']
+            if code.startswith('6'):
+                _DYNAMIC_HOLDINGS.append(f'sh{code}')
+            else:
+                _DYNAMIC_HOLDINGS.append(f'sz{code}')
+        print(f"✅ 加载用户持仓：{len(_DYNAMIC_HOLDINGS)}只 -> {', '.join(_DYNAMIC_HOLDINGS)}")
+    except Exception as e:
+        print(f"⚠️ 加载持仓配置失败：{e}")
+        _DYNAMIC_HOLDINGS = []
 
 # 监控状态
 _monitoring_state = {
