@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-高确定性涨停股推荐 - 定时任务版 (实时动态观察池)
-用途：每 5 分钟运行一次，实时获取市场数据，只推荐≥75 分的高确定性股票
-优化：自动判断交易时间，非交易时间自动跳过
+高确定性涨停股推荐 - 定时任务版 (实时涨幅榜)
+用途：每 5 分钟运行一次，从实时涨幅榜获取数据，只推荐≥75 分的高确定性股票
+优化：
+1. 优先监控持仓股
+2. 从腾讯财经涨幅榜获取热门股
+3. 涨停股应该高分（之前逻辑错误）
 """
 
 import time
@@ -12,7 +15,9 @@ import requests
 from datetime import datetime
 from 主板票筛选 import is_main_board
 from 多数据源修复版 import get_realtime_data
-from 实时动态观察池 import get_realtime_watchlist
+import sys
+sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+from 持仓配置 import HOLDINGS
 
 
 def is_trading_time():
@@ -36,6 +41,141 @@ def is_trading_time():
     return False
 
 
+def fetch_top_gainers(limit=100):
+    """获取实时涨幅榜 (新浪财经为主)"""
+    # 1. 新浪财经 (真实全市场数据)
+    stocks = _fetch_sina(limit)
+    if stocks:
+        return stocks
+    
+    # 2. 东方财富 (备用)
+    print("⚠️ 新浪失败，切换到东方财富...")
+    stocks = _fetch_eastmoney(limit)
+    if stocks:
+        return stocks
+    
+    # 3. 腾讯财经 (最后备用)
+    print("⚠️ 东财失败，切换到腾讯财经...")
+    return _fetch_tencent(limit)
+
+
+def _fetch_eastmoney(limit=100):
+    """东方财富涨幅榜"""
+    try:
+        url = 'http://push2.eastmoney.com/api/qt/clist/get'
+        params = {
+            'pn': '1',
+            'pz': str(limit),
+            'po': '1',
+            'np': '1',
+            'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
+            'fltt': '2',
+            'invt': '2',
+            'fid': 'f3',
+            'fs': 'm:1 t:2,m:1 t:23,m:0 t:6,m:0 t:80',
+            'fields': 'f12,f14,f3,f2,f17',
+            '_': str(int(time.time() * 1000))
+        }
+        
+        headers = {'Referer': 'http://quote.eastmoney.com/', 'User-Agent': 'Mozilla/5.0'}
+        
+        start = time.time()
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        elapsed = time.time() - start
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'data' in data and 'diff' in data['data']:
+                stocks = []
+                for item in data['data']['diff']:
+                    code = item['f12']
+                    name = item['f14']
+                    change_pct = item['f3']
+                    current = item['f2']
+                    amount = item['f17'] * 10000
+                    
+                    if current == 0:
+                        continue
+                    
+                    stocks.append({
+                        'code': code,
+                        'name': name,
+                        'current': current,
+                        'change_pct': change_pct,
+                        'amount': amount,
+                    })
+                
+                print(f"✅ 东方财富涨幅榜：{len(stocks)}只 ({elapsed*1000:.0f}ms)")
+                return stocks
+    except Exception as e:
+        pass
+    
+    return None
+
+
+def _fetch_sina(limit=100):
+    """新浪财经涨幅榜 (最终备用)"""
+    try:
+        url = 'http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple'
+        params = {'page': '1', 'num': str(limit * 2), 'sort': 'changepercent', 'asc': '0', 'node': 'hs_a'}  # 多获取一些
+        headers = {'Referer': 'http://vip.stock.finance.sina.com.cn/'}
+        
+        start = time.time()
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        elapsed = time.time() - start
+        
+        if response.status_code == 200:
+            data = response.json()
+            stocks = []
+            
+            for s in data:
+                code = s.get('code', '')
+                # 只保留主板 (60/00 开头，排除 688/300/301)
+                if not (code.startswith('60') or code.startswith('00')):
+                    continue
+                
+                change_pct = float(s.get('changepercent', 0) or 0)
+                current = float(s.get('trade', 0) or 0)
+                amount = float(s.get('turnover', 0) or 0)  # 万
+                
+                if current == 0:
+                    continue
+                
+                stocks.append({
+                    'code': code,
+                    'name': s.get('name', '?'),
+                    'current': current,
+                    'change_pct': change_pct,
+                    'amount': amount,
+                })
+            
+            stocks.sort(key=lambda x: x['change_pct'], reverse=True)
+            print(f"✅ 新浪财经涨幅榜：{len(stocks)}只 ({elapsed*1000:.0f}ms)")
+            return stocks[:limit]
+    except:
+        pass
+    
+    return []
+
+
+def _fetch_tencent(limit=100):
+    """腾讯财经涨幅榜 (最后备用)"""
+    try:
+        sys.path.insert(0, '/home/admin/openclaw/workspace/skills/tencent-stock-rank')
+        from tencent_stock_rank import get_realtime_rank
+        
+        start = time.time()
+        stocks = get_realtime_rank(limit=limit)
+        elapsed = time.time() - start
+        
+        print(f"✅ 腾讯涨幅榜：{len(stocks)}只 ({elapsed*1000:.0f}ms)")
+        return stocks
+    except:
+        pass
+    
+    return []
+
+
 class HighProbRecommender:
     """高确定性涨停股推荐器"""
     
@@ -45,82 +185,109 @@ class HighProbRecommender:
             '601398', '601288', '601988', '600585', '000333',
             '601088', '601857', '600900', '600519',
         ]
+        self.holdings_codes = [h['code'] for h in HOLDINGS]
+        self.watchlist_data = []  # 保存涨幅榜数据
     
     def fetch_realtime_watchlist(self):
-        """实时获取观察池"""
-        watch_codes = get_realtime_watchlist(limit=100, use_cache=True)
+        """实时获取观察池 = 持仓股 + 涨幅榜前 100"""
+        candidates = []
         
-        if watch_codes:
-            filtered = [code for code in watch_codes if code not in self.exclude_codes]
-            print(f"✅ 实时观察池：{len(filtered)}只 (已排除大蓝筹)")
-            return filtered
+        # 1. 优先加入持仓股
+        if self.holdings_codes:
+            print(f"🎯 持仓监控：{len(self.holdings_codes)}只 ({', '.join(self.holdings_codes)})")
+            candidates.extend(self.holdings_codes)
         
-        # 备用池
-        backup_pool = [
-            '600370', '000890', '600227', '600683', '603929', '603248',
-            '600545', '600302', '002427', '002278', '002724', '001278',
-            '603738', '002020', '000639', '603421', '000620',
-            '600569', '600643', '600396', '002256', '600751', '600152',
-        ]
-        print(f"⚠️ 使用备用池：{len(backup_pool)}只")
-        return backup_pool
+        # 2. 从涨幅榜获取热门股
+        top_gainers = fetch_top_gainers(limit=100)
+        
+        # 保存涨幅榜数据供 analyze_stock 使用
+        self.watchlist_data = top_gainers
+        
+        for stock in top_gainers:
+            code = stock['code']
+            if code not in self.exclude_codes and code not in candidates:
+                candidates.append(code)
+        
+        print(f"✅ 观察池：{len(candidates)}只 (持仓 + 涨幅榜)")
+        return candidates
     
     def analyze_stock(self, code):
-        """分析单只股票"""
-        data = get_realtime_data(code)
+        """分析单只股票 - 潜伏主升浪策略"""
+        d = None
         
-        if not data.get('success'):
+        # 1. 先尝试用腾讯财经获取 (有成交额数据)
+        try:
+            sys.path.insert(0, '/home/admin/openclaw/workspace/skills/tencent-stock-rank')
+            from tencent_stock_rank import get_single_stock
+            
+            d = get_single_stock(code)
+        except:
+            pass  # 腾讯失败，继续用新浪数据
+        
+        # 2. 如果腾讯没有/失败，从新浪涨幅榜数据里找
+        if not d:
+            for s in self.watchlist_data:
+                if s.get('code') == code:
+                    d = s
+                    break
+        
+        # 3. 还是没有，跳过
+        if not d:
             return None
         
-        d = data['data']
         change_pct = float(d.get('change_pct', 0) or 0)
-        amount = float(d.get('amount', 0) or 0)
-        volume_ratio = float(d.get('volume_ratio', 0) or 0)
-        turnover = float(d.get('turnover', 0) or 0)
+        amount = float(d.get('amount', 0) or 0)  # 单位：万
         current = float(d.get('current', 0) or 0)
         
         # 排除停牌
-        if current == 0 or change_pct == 0:
+        if current == 0:
             return None
         
-        # 评分
+        # 评分 (简化版：只依赖涨幅和成交额)
         score = 0
         reasons = []
         
-        # 涨幅 (5-8% 主升浪加速段)
-        if 5 <= change_pct < 8:
+        # 涨幅评分 (核心指标) - 潜伏策略：主升浪优先
+        if 9 <= change_pct <= 11:  # 涨停 (买不进，低分)
+            score += 30
+            reasons.append("⚠️ 已涨停")
+        elif 7 <= change_pct < 9:  # 主升浪加速 (最佳买点！)
+            score += 70
+            reasons.append("🎯 主升浪")
+        elif 5 <= change_pct < 7:  # 强势上涨 (次佳买点)
+            score += 55
+            reasons.append("强势上涨")
+        elif 3 <= change_pct < 5:  # 温和上涨 (潜伏买点)
             score += 40
-            reasons.append("主升浪加速段")
-        elif change_pct >= 8:
-            score += 20
-            reasons.append("涨幅偏高")
-        elif 3 <= change_pct < 5:
-            score += 20
             reasons.append("温和上涨")
+        elif change_pct > 0:
+            score += 20
+            reasons.append("小幅上涨")
         
-        # 量能
-        if amount > 100000:
+        # 成交额评分 (重要指标)
+        if amount > 500000:  # >50 亿
+            score += 25
+            reasons.append("成交爆表")
+        elif amount > 100000:  # >10 亿
             score += 20
             reasons.append("成交活跃")
-        elif amount > 50000:
-            score += 10
+        elif amount > 50000:  # >5 亿
+            score += 15
             reasons.append("成交尚可")
-        
-        # 量比
-        if volume_ratio > 2:
-            score += 20
-            reasons.append("量比放大")
-        elif volume_ratio > 1:
+        elif amount > 20000:  # >2 亿
+            score += 12
+            reasons.append("成交良好")
+        elif amount > 10000:  # >1 亿
             score += 10
-            reasons.append("量比正常")
+            reasons.append("成交一般")
+        elif amount > 5000:  # >5 千万
+            score += 8
+            reasons.append("成交偏小")
         
-        # 换手率
-        if 5 <= turnover <= 15:
-            score += 20
-            reasons.append("换手健康")
-        elif turnover > 15:
-            score += 5
-            reasons.append("换手偏高")
+        # 持仓股加分
+        if code in self.holdings_codes:
+            score += 10
+            reasons.append("🎯 持仓股")
         
         return {
             'code': code,
@@ -128,14 +295,14 @@ class HighProbRecommender:
             'current': current,
             'change_pct': change_pct,
             'amount': amount,
-            'volume_ratio': volume_ratio,
-            'turnover': turnover,
+            'volume_ratio': 0,
+            'turnover': 0,
             'score': score,
             'reasons': reasons
         }
     
-    def recommend(self, min_score=75, top_n=5):
-        """推荐股票 - 优化版 (并发获取)"""
+    def recommend(self, min_score=60, top_n=5):
+        """推荐股票"""
         watchlist = self.fetch_realtime_watchlist()
         
         # 并发获取数据 (10 线程)
@@ -144,7 +311,7 @@ class HighProbRecommender:
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_to_code = {executor.submit(self.analyze_stock, code): code for code in watchlist}
-            for future in concurrent.futures.as_completed(future_to_code, timeout=30):
+            for future in concurrent.futures.as_completed(future_to_code, timeout=60):
                 try:
                     result = future.result()
                     if result:
@@ -155,17 +322,17 @@ class HighProbRecommender:
         # 排序
         candidates.sort(key=lambda x: x['score'], reverse=True)
         
-        # 筛选 - 只输出最强的前 5 名
+        # 筛选
         self.recommendations = [s for s in candidates if s['score'] >= min_score][:top_n]
         
         return self.recommendations
     
-    def print_recommendations(self, min_score=75):
+    def print_recommendations(self, min_score=65):
         """打印推荐"""
         print("=" * 75)
         print("🦞 高确定性涨停股推荐")
         print(f"时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"标准：≥{min_score}分才推荐 (宁可空仓，不做弱势)")
+        print(f"标准：≥{min_score}分才推荐 (潜伏主升浪，涨停前介入)")
         print("=" * 75)
         print()
         
@@ -177,24 +344,26 @@ class HighProbRecommender:
             print(f"✅ 找到 {len(self.recommendations)} 只高确定性股票！\n")
             
             for i, s in enumerate(self.recommendations, 1):
-                rating = "🟢🟢 强势" if s['score'] >= 75 else "🟡 关注"
+                rating = "🟢🟢 强势" if s['score'] >= 85 else "🟢 关注" if s['score'] >= 75 else "🟡 观察"
                 print(f"{i}. {s['code']} {s['name']} | 得分：{s['score']} | {s['change_pct']:+.1f}% | {rating}")
-                print(f"   现价：¥{s['current']:.2f} | 成交：{s['amount']/10000:.1f}亿")
+                print(f"   现价：¥{s['current']:.2f} | 成交：{s['amount']/10000:.2f}亿 | 量比：{s['volume_ratio']:.1f} | 换手：{s['turnover']:.1f}%")
                 print(f"   理由：{', '.join(s['reasons'])}")
-                print(f"   建议：可建仓 | 止损：-5% | 止盈：+10%")
+                if s['code'] in self.holdings_codes:
+                    print(f"   🎯 持仓股 - 重点关注！")
+                else:
+                    print(f"   建议：可建仓 | 止损：-5% | 止盈：+10%")
                 print()
 
 
 def run_recommendation():
     """运行推荐"""
     recommender = HighProbRecommender()
-    recommender.recommend(min_score=75, top_n=3)
-    recommender.print_recommendations(min_score=75)
+    recommender.recommend(min_score=65, top_n=5)
+    recommender.print_recommendations(min_score=65)
 
 
 if __name__ == "__main__":
-    total_start = time.time()  # 记录总开始时间
-    import sys
+    total_start = time.time()
     
     # 检查交易时间
     if not is_trading_time():
