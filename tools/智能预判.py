@@ -33,21 +33,27 @@ class SmartPrefetch:
         self._load_watch_list()
     
     def _load_user_holdings(self):
-        """加载用户持仓"""
+        """加载用户持仓 - 从统一配置文件读取"""
         try:
-            # 从 MEMORY.md 读取持仓
-            memory_file = self.workspace / "MEMORY.md"
-            if memory_file.exists():
-                content = memory_file.read_text(encoding='utf-8')
-                
-                # 简单解析持仓表格
-                import re
-                pattern = r'\| (\w+) \| (\d+)\.\d+ 元 \| (\d+\.\d+)% \|'
-                matches = re.findall(pattern, content)
-                
-                self.user_holdings = [code for name, code, pct in matches]
-                print(f"✅ 加载用户持仓：{len(self.user_holdings)}只")
+            # 优先从持仓配置.py 读取
+            config_file = self.workspace / "tools" / "持仓配置.py"
+            if config_file.exists():
+                import sys
+                sys.path.insert(0, str(self.workspace / "tools"))
+                from 持仓配置 import HOLDINGS
+                self.user_holdings = [h['code'] for h in HOLDINGS] if HOLDINGS else []
+                print(f"✅ 加载用户持仓 (从持仓配置.py): {len(self.user_holdings)}只")
             else:
+                # 备用：从 MEMORY.md 读取持仓
+                memory_file = self.workspace / "MEMORY.md"
+                if memory_file.exists():
+                    content = memory_file.read_text(encoding='utf-8')
+                    import re
+                    pattern = r'\| (\w+) \| (\d+)\.\d+ 元 \| (\d+\.\d+)% \|'
+                    matches = re.findall(pattern, content)
+                    self.user_holdings = [code for name, code, pct in matches]
+                    print(f"✅ 加载用户持仓 (从 MEMORY.md): {len(self.user_holdings)}只")
+                else:
                 print("⚠️ MEMORY.md 不存在，使用默认持仓")
                 self.user_holdings = ["002828", "002342"]  # 贝肯能源、巨力索具
         except Exception as e:
