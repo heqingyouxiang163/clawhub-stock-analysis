@@ -10,13 +10,15 @@
 import requests
 import time
 from datetime import datetime
+import sys
+sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
 
+# 统一引用持仓配置文件
+from 持仓配置 import HOLDINGS
 
-# 持仓配置
-HOLDINGS = {
-    '002828': {'name': '贝肯能源', 'cost': 14.132},
-    '002342': {'name': '巨力索具', 'cost': 24.410},
-}
+# 止损止盈阈值
+STOP_LOSS_PCT = -5.0   # -5% 止损
+TAKE_PROFIT_PCT = 10.0  # +10% 止盈
 
 # 止损止盈阈值
 STOP_LOSS_PCT = -5.0   # -5% 止损
@@ -44,40 +46,47 @@ def check_holdings():
     """检查持仓"""
     alerts = []
     
-    for code, info in HOLDINGS.items():
+    for holding in HOLDINGS:
+        code = holding['code']
+        name = holding['name']
+        cost = holding['cost']
+        shares = holding.get('shares', 1000)
+        
         price = get_price(code)
         if price == 0:
             continue
         
-        cost = info['cost']
         pnl_pct = (price - cost) / cost * 100
-        pnl_amount = (price - cost) * 1000  # 假设 1000 股
+        pnl_amount = (price - cost) * shares
         
         # 判断触发条件
         if pnl_pct <= STOP_LOSS_PCT:
             alerts.append({
                 'code': code,
-                'name': info['name'],
+                'name': name,
                 'price': price,
                 'pnl_pct': pnl_pct,
+                'pnl_amount': pnl_amount,
                 'type': '止损',
                 'action': f'⚠️ 触发止损 ({STOP_LOSS_PCT}%)'
             })
         elif pnl_pct >= TAKE_PROFIT_PCT:
             alerts.append({
                 'code': code,
-                'name': info['name'],
+                'name': name,
                 'price': price,
                 'pnl_pct': pnl_pct,
+                'pnl_amount': pnl_amount,
                 'type': '止盈',
                 'action': f'✅ 触发止盈 ({TAKE_PROFIT_PCT}%)'
             })
         else:
             alerts.append({
                 'code': code,
-                'name': info['name'],
+                'name': name,
                 'price': price,
                 'pnl_pct': pnl_pct,
+                'pnl_amount': pnl_amount,
                 'type': '持有',
                 'action': '继续持有'
             })
