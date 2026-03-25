@@ -15,21 +15,10 @@ import time
 
 # ==================== 配置区 ====================
 
-# 持仓配置
-HOLDINGS = [
-    {
-        "code": "002455",
-        "name": "百川股份",
-        "cost": 16.318,
-        "shares": 500,
-    },
-    {
-        "code": "603538",
-        "name": "美诺华",
-        "cost": 24.370,
-        "shares": 500,
-    },
-]
+# 统一引用持仓配置文件
+import sys
+sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+from 持仓配置 import HOLDINGS
 
 # 输出目录
 OUTPUT_DIR = "/home/admin/openclaw/workspace/temp/分析报告"

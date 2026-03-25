@@ -24,6 +24,10 @@
     "captcha-auto": {
       "version": "1.0.7",
       "installedAt": 1773634441123
+    },
+    "stock-monitor-skill": {
+      "version": "0.1.0",
+      "installedAt": 1774419122868
     }
   }
 }

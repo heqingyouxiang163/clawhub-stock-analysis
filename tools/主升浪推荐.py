@@ -21,7 +21,7 @@ class MainWaveRecommender:
         self.watch_codes = [
             # 3 连板 (主升浪龙头)
             '600370',  # 三房巷
-            '000890',  # 法尔胜
+              
             
             # 2 连板 (主升浪初期)
             '600227',  # 赤天化

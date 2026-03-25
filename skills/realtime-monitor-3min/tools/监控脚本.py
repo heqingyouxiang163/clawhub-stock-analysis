@@ -24,8 +24,13 @@ from realtime_monitor import (
 
 # ==================== 配置区 ====================
 
-# 你的持仓股/关注股
-WATCHLIST = ['002342', '603778', '002828']
+# 从统一持仓配置导入
+import sys
+sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+from 持仓配置 import HOLDINGS
+
+# 你的持仓股/关注股 (从持仓配置自动获取)
+WATCHLIST = [h['code'] for h in HOLDINGS] if HOLDINGS else ['002342', '603778', '002828']
 
 # 监控间隔 (秒)
 MONITOR_INTERVAL = 180  # 3 分钟

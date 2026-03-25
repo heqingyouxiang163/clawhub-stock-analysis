@@ -21,7 +21,7 @@ class LimitUpRecommenderV2:
         self.watch_codes = [
             # 3 连板
             '600370',  # 三房巷
-            '000890',  # 法尔胜
+              
             
             # 2 连板
             '600227',  # 赤天化

@@ -17,11 +17,10 @@ from realtime_monitor import get_realtime_data
 from datetime import datetime
 
 
-# 持仓配置
-HOLDINGS = [
-    {"code": "002342", "name": "巨力索具", "cost": 14.132},
-    {"code": "603778", "name": "国晟科技", "cost": 24.410},
-]
+# 统一引用持仓配置文件
+import sys
+sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+from 持仓配置 import HOLDINGS
 
 
 def main():

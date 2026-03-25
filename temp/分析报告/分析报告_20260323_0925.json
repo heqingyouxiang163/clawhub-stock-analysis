@@ -1,0 +1,141 @@
+{
+  "timestamp": "2026-03-23T09:25:05.822973",
+  "market_sentiment": {
+    "up": 0,
+    "down": 0,
+    "ratio": 1
+  },
+  "north_flow": 0,
+  "stocks": [
+    {
+      "code": "002455",
+      "name": "百川股份",
+      "close": 11.89,
+      "cost": 16.318,
+      "shares": 500,
+      "profit": -2214.0000000000005,
+      "profit_pct": -27.1356783919598,
+      "vol_indicators": {
+        "volume_ratio": 0.01,
+        "vol_trend": "缩量",
+        "vol_price_relation": "量缩价跌",
+        "vol_price_score": 5,
+        "vol_status": "地量",
+        "vol_status_score": 5,
+        "volume_ratio_score": 0,
+        "vol_ma5": 1101604,
+        "vol_ma20": 1259973
+      },
+      "tech_indicators": {
+        "close": 11.89,
+        "change": -1.65,
+        "ma5": 13.1,
+        "ma10": 13.99,
+        "ma20": 13.72,
+        "ma60": 10.2,
+        "ma_pattern": "纠缠",
+        "ma_score": 7,
+        "macd_status": "死叉",
+        "macd_score": 3,
+        "rsi": 46.6,
+        "rsi_status": "中性",
+        "rsi_score": 6,
+        "bb_position": 9.8,
+        "bb_status": "接近下轨",
+        "bb_score": 10
+      },
+      "sentiment_indicators": {
+        "north_flow": 0,
+        "north_score": 8,
+        "super_large_flow": 0,
+        "super_large_score": 8,
+        "large_flow": 0,
+        "large_score": 3,
+        "small_flow": 0,
+        "diff_score": 3,
+        "market_ratio": 1,
+        "market_score": 3,
+        "sentiment_total": 25
+      },
+      "limit_up_info": {
+        "grade": "非涨停",
+        "score": 0,
+        "details": "当日未涨停"
+      },
+      "limit_down_risk": null,
+      "scores": {
+        "vol_score": 20,
+        "tech_score": 13.0,
+        "sentiment_score": 25,
+        "total": 58.0
+      },
+      "rating": "🟡 中性",
+      "action": "观望"
+    },
+    {
+      "code": "603538",
+      "name": "美诺华",
+      "close": 27.92,
+      "cost": 24.37,
+      "shares": 500,
+      "profit": 1775.0000000000005,
+      "profit_pct": 14.567090685268774,
+      "vol_indicators": {
+        "volume_ratio": 0.15,
+        "vol_trend": "缩量",
+        "vol_price_relation": "量缩价涨",
+        "vol_price_score": 5,
+        "vol_status": "地量",
+        "vol_status_score": 5,
+        "volume_ratio_score": 0,
+        "vol_ma5": 228792,
+        "vol_ma20": 135503
+      },
+      "tech_indicators": {
+        "close": 27.92,
+        "change": 0.29,
+        "ma5": 26.76,
+        "ma10": 25.4,
+        "ma20": 23.48,
+        "ma60": 21.64,
+        "ma_pattern": "强多头",
+        "ma_score": 15,
+        "macd_status": "金叉",
+        "macd_score": 10,
+        "rsi": 80.47,
+        "rsi_status": "超买",
+        "rsi_score": 3,
+        "bb_position": 96.6,
+        "bb_status": "接近上轨",
+        "bb_score": 6
+      },
+      "sentiment_indicators": {
+        "north_flow": 0,
+        "north_score": 8,
+        "super_large_flow": 0,
+        "super_large_score": 8,
+        "large_flow": 0,
+        "large_score": 3,
+        "small_flow": 0,
+        "diff_score": 3,
+        "market_ratio": 1,
+        "market_score": 3,
+        "sentiment_total": 25
+      },
+      "limit_up_info": {
+        "grade": "非涨停",
+        "score": 0,
+        "details": "当日未涨停"
+      },
+      "limit_down_risk": null,
+      "scores": {
+        "vol_score": 20,
+        "tech_score": 17.0,
+        "sentiment_score": 25,
+        "total": 62.0
+      },
+      "rating": "🟢 看好",
+      "action": "持有"
+    }
+  ]
+}

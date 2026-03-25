@@ -13,10 +13,10 @@ import os
 
 # ==================== 配置区 ====================
 
-HOLDINGS = [
-    {"code": "002455", "name": "百川股份", "cost": 16.318, "shares": 500},
-    {"code": "603538", "name": "美诺华", "cost": 24.370, "shares": 500},
-]
+# 统一引用持仓配置文件
+import sys
+sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+from 持仓配置 import HOLDINGS
 
 OUTPUT_DIR = "/home/admin/openclaw/workspace/temp/智能分析_v2"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

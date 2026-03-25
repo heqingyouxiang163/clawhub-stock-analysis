@@ -11,13 +11,12 @@ from 腾讯财经_API import get_multiple_stocks, get_single_stock
 from datetime import datetime
 import json
 import os
+import time
 
 # ==================== 配置区 ====================
 
-HOLDINGS = [
-    {"code": "002342", "name": "巨力索具", "cost": 14.132, "shares": 500},
-    {"code": "603778", "name": "国晟科技", "cost": 24.410, "shares": 500},
-]
+# 统一引用持仓配置文件
+from 持仓配置 import HOLDINGS
 
 OUTPUT_DIR = "/home/admin/openclaw/workspace/temp/盘中监控"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

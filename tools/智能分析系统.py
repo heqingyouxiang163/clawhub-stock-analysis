@@ -15,10 +15,8 @@ import time
 
 # ==================== 配置区 ====================
 
-HOLDINGS = [
-    {"code": "002828", "name": "贝肯能源", "cost": 14.850, "shares": 500},
-    {"code": "002342", "name": "巨力索具", "cost": 14.253, "shares": 900},
-]
+# 统一引用持仓配置文件
+from 持仓配置 import HOLDINGS
 
 OUTPUT_DIR = "/home/admin/openclaw/workspace/temp/智能分析"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
