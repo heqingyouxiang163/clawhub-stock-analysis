@@ -32,9 +32,10 @@ def get_realtime_gainers(limit=150):
     start_time = time.time()
     
     # 东方财富网实时行情 API
-    # 沪深 A 股：m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23
+    # 沪深主板：m:0 t:6,m:1 t:2 (排除创业板 t:80 和科创板 t:23)
     # m:0=深市，m:1=沪市
-    # t:6=深市主板，t:80=创业板，t:2=沪市主板，t:23=科创板
+    # t:6=深市主板 (000/001/002/003 开头)
+    # t:2=沪市主板 (600/601/603/605 开头)
     url = "http://push2.eastmoney.com/api/qt/clist/get"
     
     params = {
@@ -46,7 +47,7 @@ def get_realtime_gainers(limit=150):
         'fltt': '2',
         'invt': '2',
         'fid': 'f3',  # 按涨幅排序
-        'fs': 'm:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23',  # 沪深 A 股
+        'fs': 'm:0 t:6,m:1 t:2',  # 沪深主板（排除创业板和科创板）
         'fields': 'f12,f14,f3,f2,f4,f268',  # 代码，名称，涨幅，现价，涨跌额，排名
         '_': str(int(time.time() * 1000))
     }
