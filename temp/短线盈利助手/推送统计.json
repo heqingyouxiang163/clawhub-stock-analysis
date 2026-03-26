@@ -119,8 +119,43 @@
       "time": "2026-03-25 10:03",
       "count": 0,
       "stocks": []
+    },
+    {
+      "time": "2026-03-26 09:15",
+      "count": 0,
+      "stocks": []
+    },
+    {
+      "time": "2026-03-26 09:30",
+      "count": 0,
+      "stocks": []
+    },
+    {
+      "time": "2026-03-26 09:35",
+      "count": 0,
+      "stocks": []
+    },
+    {
+      "time": "2026-03-26 09:45",
+      "count": 0,
+      "stocks": []
+    },
+    {
+      "time": "2026-03-26 10:00",
+      "count": 0,
+      "stocks": []
+    },
+    {
+      "time": "2026-03-26 10:30",
+      "count": 0,
+      "stocks": []
+    },
+    {
+      "time": "2026-03-26 10:45",
+      "count": 0,
+      "stocks": []
     }
   ],
-  "total_pushes": 24,
+  "total_pushes": 31,
   "total_stocks": 0
 }
