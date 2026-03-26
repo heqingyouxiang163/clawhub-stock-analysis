@@ -6,8 +6,9 @@
 用途：每 5 分钟运行一次，从实时涨幅榜获取数据，只推荐≥75 分的高确定性股票
 优化：
 1. 优先监控持仓股
-2. 从腾讯财经涨幅榜获取热门股
+2. 使用「实时 A 股涨幅榜」技能获取沪深主板数据
 3. 涨停股应该高分（之前逻辑错误）
+4. 只推荐沪深主板股票（排除创业板和科创板）
 """
 
 import time
@@ -17,7 +18,9 @@ from 主板票筛选 import is_main_board
 from 多数据源修复版 import get_realtime_data
 import sys
 sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
+sys.path.insert(0, '/home/admin/openclaw/workspace/skills/实时 A 股涨幅榜/tools')
 from 持仓配置 import HOLDINGS
+from 获取涨幅榜 import get_realtime_gainers  # 导入新技能
 
 
 def is_trading_time():
@@ -41,20 +44,61 @@ def is_trading_time():
     return False
 
 
-def fetch_top_gainers(limit=100):
-    """获取实时涨幅榜 (新浪财经为主)"""
-    # 1. 新浪财经 (真实全市场数据)
+def fetch_top_gainers(limit=150):
+    """
+    获取实时涨幅榜 - 使用「实时 A 股涨幅榜」技能
+    
+    只获取沪深主板股票（排除创业板和科创板）
+    专为高确定性推荐设计
+    """
+    print("📈 使用「实时 A 股涨幅榜」技能获取沪深主板数据...")
+    start_time = time.time()
+    
+    try:
+        # 使用新技能获取沪深主板涨幅榜
+        stocks = get_realtime_gainers(limit=limit)
+        elapsed = time.time() - start_time
+        
+        if stocks:
+            print(f"✅ 成功获取{len(stocks)}只沪深主板股票，耗时{elapsed*1000:.0f}ms")
+            # 转换为统一格式
+            formatted_stocks = []
+            for s in stocks:
+                formatted_stocks.append({
+                    'code': s['code'],
+                    'name': s['name'],
+                    'change_pct': s['change_pct'],
+                    'current': s['current'],
+                    'change_amt': s['change_amt'],
+                    'amount': s.get('amount', 0)  # 成交额
+                })
+            return formatted_stocks
+        else:
+            print("⚠️ 技能返回空数据，切换到备用方案...")
+    except Exception as e:
+        print(f"⚠️ 技能调用失败：{e}，切换到备用方案...")
+    
+    # 备用方案：使用旧的多数据源
+    return _fetch_fallback(limit)
+
+
+def _fetch_fallback(limit=100):
+    """
+    备用方案：多数据源获取涨幅榜
+    当技能失败时使用
+    """
+    # 1. 新浪财经
     stocks = _fetch_sina(limit)
     if stocks:
         return stocks
     
-    # 2. 东方财富 (备用)
+    # 2. 东方财富
     print("⚠️ 新浪失败，切换到东方财富...")
     stocks = _fetch_eastmoney(limit)
     if stocks:
         return stocks
     
-    # 3. 腾讯财经 (最后备用)
+    # 3. 腾讯财经
     print("⚠️ 东财失败，切换到腾讯财经...")
     return _fetch_tencent(limit)
 
@@ -241,6 +285,10 @@ class HighProbRecommender:
         
         # 排除停牌
         if current == 0:
+            return None
+        
+        # 只推荐沪深主板（排除创业板和科创板）
+        if not is_main_board(code):
             return None
         
         # 评分 (简化版：只依赖涨幅和成交额)
