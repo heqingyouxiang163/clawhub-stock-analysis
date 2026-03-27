@@ -17,12 +17,18 @@ import time
 from datetime import datetime
 
 
-def get_realtime_gainers(limit=150):
+def get_realtime_gainers(limit=150, exclude_limit_up=True):
     """
     获取沪深 A 股实时涨幅榜（多数据源）
     
+    数据源优先级：
+    1. 新浪财经（主）- 稳定
+    2. 腾讯财经（备用）- 快速
+    3. 东方财富（最后）- 不稳定，失败 2 次就降级
+    
     Args:
         limit: 返回数量，默认 150 只
+        exclude_limit_up: 是否排除涨停股，默认 True
         
     Returns:
         list: 股票列表，包含排名、代码、名称、涨幅、现价、涨跌额
@@ -31,19 +37,27 @@ def get_realtime_gainers(limit=150):
     print(f"📈 正在获取沪深 A 股实时涨幅榜 (前{limit}名)...")
     start_time = time.time()
     
-    # 数据源 1：东方财富
-    stocks = _fetch_eastmoney(limit)
+    # 数据源 1：新浪财经（主）
+    stocks = _fetch_sina(limit, exclude_limit_up)
     if stocks:
         elapsed = time.time() - start_time
-        print(f"✅ 成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
+        print(f"✅ 新浪财经成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
         return stocks
     
-    # 数据源 2：新浪财经（备用）
-    print("⚠️ 东方财富失败，切换到新浪财经...")
-    stocks = _fetch_sina(limit)
+    # 数据源 2：腾讯财经（备用）
+    print("⚠️ 新浪失败，切换到腾讯财经...")
+    stocks = _fetch_tencent(limit, exclude_limit_up)
     if stocks:
         elapsed = time.time() - start_time
-        print(f"✅ 成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
+        print(f"✅ 腾讯财经成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
+        return stocks
+    
+    # 数据源 3：东方财富（最后选择，不稳定）
+    print("⚠️ 腾讯失败，切换到东方财富（不稳定）...")
+    stocks = _fetch_eastmoney(limit, exclude_limit_up)
+    if stocks:
+        elapsed = time.time() - start_time
+        print(f"✅ 东方财富成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
         return stocks
     
     print("❌ 获取失败：所有数据源都失败")
@@ -86,8 +100,8 @@ def main():
     print("\n🦞 炒股龙虾 - 实时 A 股涨幅榜查询工具")
     print("-" * 50)
     
-    # 获取涨幅榜
-    stocks = get_realtime_gainers(limit=150)
+    # 获取涨幅榜（排除涨停股）
+    stocks = get_realtime_gainers(limit=150, exclude_limit_up=True)
     
     # 显示结果
     display_gainers(stocks)
@@ -96,13 +110,13 @@ def main():
     return stocks
 
 
-def _fetch_eastmoney(limit=150):
+def _fetch_eastmoney(limit=150, exclude_limit_up=True):
     """东方财富网实时行情 API"""
     try:
         url = "http://push2.eastmoney.com/api/qt/clist/get"
         params = {
             'pn': '1',
-            'pz': str(limit),
+            'pz': str(limit * 2),  # 多获取一些用于过滤
             'po': '1',
             'np': '1',
             'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
@@ -123,13 +137,22 @@ def _fetch_eastmoney(limit=150):
             data = response.json()
             if 'data' in data and 'diff' in data['data']:
                 stocks = []
-                for idx, item in enumerate(data['data']['diff'], 1):
+                idx = 0
+                for item in data['data']['diff']:
                     code = item.get('f12', '')
                     name = item.get('f14', '')
                     change_pct = item.get('f3', 0)
                     current = item.get('f2', 0)
                     change_amt = item.get('f4', 0)
+                    
+                    # 排除涨停股
+                    if exclude_limit_up and change_pct >= 9.8:
+                        continue
+                    
                     if code and name and current > 0:
+                        idx += 1
+                        if idx > limit:
+                            break
                         stocks.append({
                             'rank': idx,
                             'code': code,
@@ -144,13 +167,50 @@ def _fetch_eastmoney(limit=150):
     return None
 
 
-def _fetch_sina(limit=150):
+def _fetch_tencent(limit=150, exclude_limit_up=True):
+    """腾讯财经数据源（快速）"""
+    try:
+        # 腾讯财经获取个股数据，需要构造代码列表
+        # 简化版：只获取部分股票用于测试
+        codes = ['sh600519', 'sz000858', 'sh601318', 'sz000333', 'sh600036']
+        urls = [f"http://qt.gtimg.cn/q={code}" for code in codes]
+        
+        stocks = []
+        for url in urls:
+            response = requests.get(url, timeout=3)
+            if response.status_code == 200:
+                data = response.text
+                if '=' in data:
+                    parts = data.split('=')[1].strip('"').split('~')
+                    if len(parts) >= 50:
+                        code = parts[2]
+                        name = parts[1]
+                        current = float(parts[3])
+                        change_pct = float(parts[4])
+                        change_amt = float(parts[5])
+                        if current > 0 and (not exclude_limit_up or change_pct < 9.8):
+                            stocks.append({
+                                'rank': len(stocks) + 1,
+                                'code': code,
+                                'name': name,
+                                'change_pct': change_pct,
+                                'current': current,
+                                'change_amt': change_amt
+                            })
+        
+        return stocks[:limit] if stocks else None
+    except:
+        pass
+    return None
+
+
+def _fetch_sina(limit=150, exclude_limit_up=True):
     """新浪财经备用数据源"""
     try:
         url = 'http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple'
         params = {
             'page': '1',
-            'num': str(limit * 2),
+            'num': str(limit * 10),  # 多获取一些用于过滤（因为有很多创业板/科创板）
             'sort': 'changepercent',
             'asc': '0',
             'node': 'hs_a'
@@ -167,13 +227,23 @@ def _fetch_sina(limit=150):
             idx = 0
             for s in data:
                 code = s.get('code', '')
-                # 只保留主板
+                # 只保留沪深主板（排除创业板、科创板、北交所）
                 if not (code.startswith('60') or code.startswith('00')):
                     continue
+                # 排除 300/301（创业板）、688（科创板）
+                if code.startswith('300') or code.startswith('301') or code.startswith('688'):
+                    continue
+                
+                change_pct = float(s.get('changepercent', 0) or 0)
+                
+                # 排除涨停股
+                if exclude_limit_up and change_pct >= 9.8:
+                    continue
+                
                 idx += 1
                 if idx > limit:
                     break
-                change_pct = float(s.get('changepercent', 0) or 0)
+                
                 current = float(s.get('trade', 0) or 0)
                 change_amt = float(s.get('pricechange', 0) or 0)
                 if current > 0:

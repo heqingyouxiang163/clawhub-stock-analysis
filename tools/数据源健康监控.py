@@ -33,8 +33,30 @@ class DataSourceMonitor:
         self.health_file = Path("/home/admin/openclaw/workspace/temp/数据源健康状态.json")
         self.notification_file = Path("/home/admin/openclaw/workspace/temp/数据源异常通知.json")
         
-        # 数据源配置
+        # 数据源配置（按优先级排序）
         self.sources = {
+            'sina': {
+                'name': '新浪财经',
+                'url': 'http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple',
+                'params': {
+                    'page': '1',
+                    'num': '10',
+                    'sort': 'changepercent',
+                    'asc': '0',
+                    'node': 'hs_a'
+                },
+                'timeout': 5,
+                'max_failures': 3,
+                'priority': 1  # 最高优先级
+            },
+            'tencent': {
+                'name': '腾讯财经',
+                'url': 'http://qt.gtimg.cn/q=sh600519',
+                'params': {},
+                'timeout': 5,
+                'max_failures': 3,
+                'priority': 2  # 第二优先级
+            },
             'eastmoney': {
                 'name': '东方财富',
                 'url': 'http://push2.eastmoney.com/api/qt/clist/get',
@@ -47,27 +69,8 @@ class DataSourceMonitor:
                     '_': str(int(time.time() * 1000))
                 },
                 'timeout': 5,
-                'max_failures': 3  # 最大失败次数
-            },
-            'sina': {
-                'name': '新浪财经',
-                'url': 'http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple',
-                'params': {
-                    'page': '1',
-                    'num': '10',
-                    'sort': 'changepercent',
-                    'asc': '0',
-                    'node': 'hs_a'
-                },
-                'timeout': 5,
-                'max_failures': 3
-            },
-            'tencent': {
-                'name': '腾讯财经',
-                'url': 'http://qt.gtimg.cn/q=sh600519',
-                'params': {},
-                'timeout': 5,
-                'max_failures': 3
+                'max_failures': 2,  # 失败 2 次就降级
+                'priority': 3  # 最低优先级（不稳定）
             }
         }
         
@@ -194,7 +197,10 @@ class DataSourceMonitor:
             with open(self.notification_file, 'w', encoding='utf-8') as f:
                 json.dump(notifications, f, ensure_ascii=False, indent=2)
             
-            print(f"\n🔔 已生成异常通知：{notification['message']}")
+            # 东方财富失败 2 次就通知，其他 3 次
+            threshold = 2 if source_id == 'eastmoney' else 3
+            if self.health_status[source_id]['consecutive_failures'] >= threshold:
+                print(f"\n🔔 已生成异常通知：{notification['message']}")
     
     def check_all(self):
         """检查所有数据源"""
