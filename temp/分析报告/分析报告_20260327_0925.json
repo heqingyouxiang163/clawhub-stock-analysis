@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-03-27T09:25:15.513203",
+  "market_sentiment": {
+    "up": 0,
+    "down": 0,
+    "ratio": 1
+  },
+  "north_flow": 0,
+  "stocks": [
+    {
+      "code": "002491",
+      "name": "通鼎互联",
+      "close": 10.72,
+      "cost": 10.182,
+      "shares": 1100,
+      "profit": 591.8000000000003,
+      "profit_pct": 5.283834217246123,
+      "vol_indicators": {
+        "volume_ratio": 0.02,
+        "vol_trend": "缩量",
+        "vol_price_relation": "量缩价跌",
+        "vol_price_score": 5,
+        "vol_status": "地量",
+        "vol_status_score": 5,
+        "volume_ratio_score": 0,
+        "vol_ma5": 1140047,
+        "vol_ma20": 1660646
+      },
+      "tech_indicators": {
+        "close": 10.72,
+        "change": -1.29,
+        "ma5": 10.55,
+        "ma10": 10.46,
+        "ma20": 11.07,
+        "ma60": 8.66,
+        "ma_pattern": "纠缠",
+        "ma_score": 7,
+        "macd_status": "死叉",
+        "macd_score": 3,
+        "rsi": 48.09,
+        "rsi_status": "中性",
+        "rsi_score": 6,
+        "bb_position": 39.5,
+        "bb_status": "轨道中部",
+        "bb_score": 7
+      },
+      "sentiment_indicators": {
+        "north_flow": 0,
+        "north_score": 8,
+        "super_large_flow": 0,
+        "super_large_score": 8,
+        "large_flow": 0,
+        "large_score": 3,
+        "small_flow": 0,
+        "diff_score": 3,
+        "market_ratio": 1,
+        "market_score": 3,
+        "sentiment_total": 25
+      },
+      "limit_up_info": {
+        "grade": "非涨停",
+        "score": 0,
+        "details": "当日未涨停"
+      },
+      "limit_down_risk": null,
+      "scores": {
+        "vol_score": 20,
+        "tech_score": 11.5,
+        "sentiment_score": 25,
+        "total": 56.5
+      },
+      "rating": "🟡 中性",
+      "action": "观望"
+    }
+  ]
+}

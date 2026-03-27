@@ -19,7 +19,7 @@ from datetime import datetime
 
 def get_realtime_gainers(limit=150):
     """
-    获取沪深 A 股实时涨幅榜
+    获取沪深 A 股实时涨幅榜（多数据源）
     
     Args:
         limit: 返回数量，默认 150 只
@@ -31,74 +31,23 @@ def get_realtime_gainers(limit=150):
     print(f"📈 正在获取沪深 A 股实时涨幅榜 (前{limit}名)...")
     start_time = time.time()
     
-    # 东方财富网实时行情 API
-    # 沪深主板：m:0 t:6,m:1 t:2 (排除创业板 t:80 和科创板 t:23)
-    # m:0=深市，m:1=沪市
-    # t:6=深市主板 (000/001/002/003 开头)
-    # t:2=沪市主板 (600/601/603/605 开头)
-    url = "http://push2.eastmoney.com/api/qt/clist/get"
-    
-    params = {
-        'pn': '1',  # 页码
-        'pz': str(limit),  # 每页数量
-        'po': '1',  # 降序排列
-        'np': '1',
-        'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
-        'fltt': '2',
-        'invt': '2',
-        'fid': 'f3',  # 按涨幅排序
-        'fs': 'm:0 t:6,m:1 t:2',  # 沪深主板（排除创业板和科创板）
-        'fields': 'f12,f14,f3,f2,f4,f268',  # 代码，名称，涨幅，现价，涨跌额，排名
-        '_': str(int(time.time() * 1000))
-    }
-    
-    headers = {
-        'Referer': 'http://quote.eastmoney.com/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    }
-    
-    try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+    # 数据源 1：东方财富
+    stocks = _fetch_eastmoney(limit)
+    if stocks:
         elapsed = time.time() - start_time
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if 'data' in data and 'diff' in data['data']:
-                stocks = []
-                
-                for idx, item in enumerate(data['data']['diff'], 1):
-                    code = item.get('f12', '')
-                    name = item.get('f14', '')
-                    change_pct = item.get('f3', 0)
-                    current = item.get('f2', 0)
-                    change_amt = item.get('f4', 0)
-                    
-                    # 跳过无效数据
-                    if not code or not name or current == 0:
-                        continue
-                    
-                    stocks.append({
-                        'rank': idx,
-                        'code': code,
-                        'name': name,
-                        'change_pct': change_pct,
-                        'current': current,
-                        'change_amt': change_amt
-                    })
-                
-                print(f"✅ 成功获取 {len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
-                return stocks
-            else:
-                print("❌ 数据格式异常")
-                return []
-        else:
-            print(f"❌ 请求失败：HTTP {response.status_code}")
-            return []
-            
-    except Exception as e:
-        print(f"❌ 获取失败：{e}")
-        return []
+        print(f"✅ 成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
+        return stocks
+    
+    # 数据源 2：新浪财经（备用）
+    print("⚠️ 东方财富失败，切换到新浪财经...")
+    stocks = _fetch_sina(limit)
+    if stocks:
+        elapsed = time.time() - start_time
+        print(f"✅ 成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
+        return stocks
+    
+    print("❌ 获取失败：所有数据源都失败")
+    return []
 
 
 def display_gainers(stocks):
@@ -145,6 +94,101 @@ def main():
     
     # 返回数据供其他模块使用
     return stocks
+
+
+def _fetch_eastmoney(limit=150):
+    """东方财富网实时行情 API"""
+    try:
+        url = "http://push2.eastmoney.com/api/qt/clist/get"
+        params = {
+            'pn': '1',
+            'pz': str(limit),
+            'po': '1',
+            'np': '1',
+            'ut': 'bd1d9ddb04089700cf9c27f6f7426281',
+            'fltt': '2',
+            'invt': '2',
+            'fid': 'f3',
+            'fs': 'm:0 t:6,m:1 t:2',  # 沪深主板
+            'fields': 'f12,f14,f3,f2,f4',
+            '_': str(int(time.time() * 1000))
+        }
+        headers = {
+            'Referer': 'http://quote.eastmoney.com/',
+            'User-Agent': 'Mozilla/5.0'
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'data' in data and 'diff' in data['data']:
+                stocks = []
+                for idx, item in enumerate(data['data']['diff'], 1):
+                    code = item.get('f12', '')
+                    name = item.get('f14', '')
+                    change_pct = item.get('f3', 0)
+                    current = item.get('f2', 0)
+                    change_amt = item.get('f4', 0)
+                    if code and name and current > 0:
+                        stocks.append({
+                            'rank': idx,
+                            'code': code,
+                            'name': name,
+                            'change_pct': change_pct,
+                            'current': current,
+                            'change_amt': change_amt
+                        })
+                return stocks
+    except:
+        pass
+    return None
+
+
+def _fetch_sina(limit=150):
+    """新浪财经备用数据源"""
+    try:
+        url = 'http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeDataSimple'
+        params = {
+            'page': '1',
+            'num': str(limit * 2),
+            'sort': 'changepercent',
+            'asc': '0',
+            'node': 'hs_a'
+        }
+        headers = {
+            'Referer': 'http://vip.stock.finance.sina.com.cn/',
+            'User-Agent': 'Mozilla/5.0'
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            stocks = []
+            idx = 0
+            for s in data:
+                code = s.get('code', '')
+                # 只保留主板
+                if not (code.startswith('60') or code.startswith('00')):
+                    continue
+                idx += 1
+                if idx > limit:
+                    break
+                change_pct = float(s.get('changepercent', 0) or 0)
+                current = float(s.get('trade', 0) or 0)
+                change_amt = float(s.get('pricechange', 0) or 0)
+                if current > 0:
+                    stocks.append({
+                        'rank': idx,
+                        'code': code,
+                        'name': s.get('name', '?'),
+                        'change_pct': change_pct,
+                        'current': current,
+                        'change_amt': change_amt
+                    })
+            return stocks
+    except:
+        pass
+    return None
 
 
 if __name__ == "__main__":
