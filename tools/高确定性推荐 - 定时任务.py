@@ -18,9 +18,9 @@ from 主板票筛选 import is_main_board
 from 多数据源修复版 import get_realtime_data
 import sys
 sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
-sys.path.insert(0, '/home/admin/openclaw/workspace/skills/实时 A 股涨幅榜/tools')
+sys.path.insert(0, '/home/admin/openclaw/workspace/skills/tencent-stock-rank')
 from 持仓配置 import HOLDINGS
-from 获取涨幅榜 import get_realtime_gainers  # 导入新技能
+from tencent_stock_rank import get_realtime_rank  # 使用成熟的腾讯财经技能
 
 
 def is_trading_time():
@@ -46,37 +46,25 @@ def is_trading_time():
 
 def fetch_top_gainers(limit=150):
     """
-    获取实时涨幅榜 - 使用「实时 A 股涨幅榜」技能
+    获取实时涨幅榜 - 使用腾讯财经技能（稳定）
     
-    只获取沪深主板股票（排除创业板和科创板）
     专为高确定性推荐设计
     """
-    print("📈 使用「实时 A 股涨幅榜」技能获取沪深主板数据...")
+    print("📈 使用腾讯财经技能获取沪深主板数据...")
     start_time = time.time()
     
     try:
-        # 使用新技能获取沪深主板涨幅榜
-        stocks = get_realtime_gainers(limit=limit)
+        # 使用腾讯财经技能获取涨幅榜
+        stocks = get_realtime_rank(limit=limit)
         elapsed = time.time() - start_time
         
         if stocks:
-            print(f"✅ 成功获取{len(stocks)}只沪深主板股票，耗时{elapsed*1000:.0f}ms")
-            # 转换为统一格式
-            formatted_stocks = []
-            for s in stocks:
-                formatted_stocks.append({
-                    'code': s['code'],
-                    'name': s['name'],
-                    'change_pct': s['change_pct'],
-                    'current': s['current'],
-                    'change_amt': s['change_amt'],
-                    'amount': s.get('amount', 0)  # 成交额
-                })
-            return formatted_stocks
+            print(f"✅ 成功获取{len(stocks)}只股票，耗时{elapsed*1000:.0f}ms")
+            return stocks
         else:
-            print("⚠️ 技能返回空数据，切换到备用方案...")
+            print("⚠️ 腾讯财经返回空数据，切换到备用方案...")
     except Exception as e:
-        print(f"⚠️ 技能调用失败：{e}，切换到备用方案...")
+        print(f"⚠️ 腾讯财经失败：{e}，切换到备用方案...")
     
     # 备用方案：使用旧的多数据源
     return _fetch_fallback(limit)
