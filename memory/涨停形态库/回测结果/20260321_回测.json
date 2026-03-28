@@ -1,0 +1,33 @@
+{
+  "date": "20260321",
+  "total": 12,
+  "win_rate": 0.75,
+  "avg_premium": 2.1041666666666665,
+  "morphology_stats": {
+    "早盘强势板": {
+      "count": 3,
+      "win_rate": 0.6666666666666666,
+      "avg_premium": -0.25000000000000006
+    },
+    "盘中板": {
+      "count": 3,
+      "win_rate": 1.0,
+      "avg_premium": 3.8833333333333333
+    },
+    "午后板": {
+      "count": 5,
+      "win_rate": 0.6,
+      "avg_premium": 2.056
+    },
+    "尾盘偷袭板": {
+      "count": 1,
+      "win_rate": 1.0,
+      "avg_premium": 4.07
+    },
+    "连板≥2": {
+      "count": 12,
+      "win_rate": 0.75,
+      "avg_premium": 2.1041666666666665
+    }
+  }
+}
