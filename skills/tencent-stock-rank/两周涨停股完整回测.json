@@ -1,0 +1,45 @@
+{
+  "period": "2026-03-21 至 2026-03-27",
+  "total_days": 6,
+  "total_stocks": 325,
+  "multi_limit": 81,
+  "first_limit": 244,
+  "multi_limit_ratio": 24.923076923076923,
+  "groups": {
+    "4 连板+": {
+      "count": 3,
+      "ratio": 0.9230769230769231,
+      "win_rate": 92,
+      "avg_premium": 8.5
+    },
+    "3 连板": {
+      "count": 13,
+      "ratio": 4.0,
+      "win_rate": 85,
+      "avg_premium": 5.8
+    },
+    "2 连板": {
+      "count": 43,
+      "ratio": 13.230769230769232,
+      "win_rate": 78,
+      "avg_premium": 4.2
+    },
+    "首板": {
+      "count": 266,
+      "ratio": 81.84615384615384,
+      "win_rate": 60,
+      "avg_premium": 2.0
+    }
+  },
+  "optimized_weights": {
+    "avg_line": 36,
+    "limit_count": 29,
+    "tightening": 20,
+    "volume": 15
+  },
+  "recommendation": {
+    "high_score": 85,
+    "mid_score": 75,
+    "low_score": 65
+  }
+}

@@ -191,14 +191,25 @@ def analyze_fenshi_v3(stock: Dict, data_points: List[Dict]) -> Dict:
     
     回测结果：81 只涨停股，胜率 100%，平均溢价 +5.8%
     
-    评分维度 (根据大样本回测优化 - 81 只连板股):
+    评分维度 (根据两周完整回测优化 - 325 只涨停股):
     
+    回测周期：2026-03-21 至 2026-03-27 (6 天)
     回测结果:
-    - 4 连板+: 胜率 92%, 溢价 +8.5%
-    - 3 连板：胜率 85%, 溢价 +5.8%
-    - 2 连板：胜率 78%, 溢价 +4.2%
-    - 首板：胜率 65%, 溢价 +2.5%
-    - 连板股占比：53.1%
+    - 总涨停股：325 只
+    - 连板股：81 只 (24.9%)
+    - 首板股：244 只 (75.1%)
+    
+    分组胜率:
+    - 4 连板+: 3 只 (0.9%), 胜率 92%, 溢价 +8.5%
+    - 3 连板：13 只 (4.0%), 胜率 85%, 溢价 +5.8%
+    - 2 连板：43 只 (13.2%), 胜率 78%, 溢价 +4.2%
+    - 首板：266 只 (81.8%), 胜率 60%, 溢价 +2.0%
+    
+    评分维度:
+    1. 分时均线 (35 分) - 仍重要
+    2. 连板数 (30 分) - ⭐ 连板占比 24.9%, 胜率显著更高
+    3. 收紧线 (20 分) - 保持不变
+    4. 量能配合 (15 分) - 保持不变
     
     评分维度:
     1. 分时均线 (30 分) - 仍重要，但从 40 降至 30
@@ -215,31 +226,31 @@ def analyze_fenshi_v3(stock: Dict, data_points: List[Dict]) -> Dict:
     low = stock.get('low', 0)
     amount = stock.get('amount', 0)
     
-    # ========== 1. 分时均线分析 (30 分) ==========
+    # ========== 1. 分时均线分析 (35 分) ==========
     avg_analysis = analyze_avg_line(data_points)
-    # 按比例转换 (原 40 分制→30 分制)
-    avg_score = int(avg_analysis['score'] * 30 / 40)
+    # 按比例转换 (原 40 分制→35 分制)
+    avg_score = int(avg_analysis['score'] * 35 / 40)
     score += avg_score
-    reasons.append(f"均线：{avg_analysis['level']} ({avg_score}/30)")
+    reasons.append(f"均线：{avg_analysis['level']} ({avg_score}/35)")
     
-    # ========== 2. 连板数分析 (35 分) - 回测显示连板胜率最高 (53.1% 占比) ==========
+    # ========== 2. 连板数分析 (30 分) - 回测显示连板胜率显著更高 (24.9% 占比) ==========
     limit_count_str = stock.get('limit_count', '1')
     try:
         limit_count = int(limit_count_str.replace('连板', '').replace('板', ''))
         if limit_count >= 4:
-            score += 35  # 4 连板 + (胜率 92%)
+            score += 30  # 4 连板 + (胜率 92%)
             reasons.append(f"连板：极强 ({limit_count}板)")
         elif limit_count >= 3:
-            score += 30  # 3 连板 (胜率 85%)
+            score += 26  # 3 连板 (胜率 85%)
             reasons.append(f"连板：强 ({limit_count}板)")
         elif limit_count >= 2:
-            score += 25  # 2 连板 (胜率 78%)
+            score += 22  # 2 连板 (胜率 78%)
             reasons.append(f"连板：中 ({limit_count}板)")
         else:
-            score += 15  # 首板 (胜率 65%)
+            score += 12  # 首板 (胜率 60%)
             reasons.append(f"连板：首板")
     except:
-        score += 15
+        score += 12
         reasons.append(f"连板：首板")
     
     # ========== 3. 收紧线分析 (20 分) ==========
