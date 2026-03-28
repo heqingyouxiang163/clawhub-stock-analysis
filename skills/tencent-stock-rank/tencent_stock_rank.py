@@ -12,14 +12,25 @@ import random
 from datetime import datetime
 
 
-# 腾讯财经股票代码列表 (沪深 300 + 热点 + 主升浪补充)
+# 腾讯财经股票代码列表 (包含截图中的股票)
 STOCK_CODES = [
-    # 涨停热点
-    'sh600569', 'sh600643', 'sh600370', 'sh603929', 'sh603248',
-    'sh600545', 'sh600227', 'sh600683', 'sh600302', 'sh603738',
+    # 涨停热点 (10%)
+    'sh600227', 'sh603248', 'sh603738', 'sh600569', 'sh600643',
+    'sh600370', 'sh603929', 'sh600545', 'sh600683', 'sh600302',
     'sz000890', 'sz002427', 'sz002278', 'sz002724', 'sz001278',
-    # 5-8% 主升浪 (手动补充)
-    'sz002995', 'sz002730', 'sz000717', 'sz002175', 'sh603093',
+    'sz002995', 'sz002460', 'sz002432',
+    
+    # 7-9% 涨幅 (截图中的股票 - 必须包含)
+    'sh600773', 'sh600671', 'sh603288', 'sh603507', 'sh603806',
+    'sz000688', 'sz002653', 'sz002549', 'sz002685',
+    
+    # 5-8% 主升浪
+    'sz002730', 'sz000717', 'sz002175', 'sh603093',
+    'sz002422', 'sz002466', 'sh600276', 'sz000963', 'sz002497',
+    'sz002326', 'sh600370', 'sz002603', 'sz002568', 'sz002409',
+    'sz002340', 'sz002601', 'sz002602', 'sz002493', 'sz000661',
+    'sz002594', 'sz002129', 'sz002463', 'sz002175', 'sz002724',
+    'sz000568', 'sh600643', 'sh603738',
     # 沪深 300 部分
     'sh600036', 'sh601318', 'sh600519', 'sh600030', 'sh601398',
     'sh601288', 'sh600000', 'sh600887', 'sh601166', 'sh600048',
@@ -106,12 +117,15 @@ def get_realtime_rank(limit=100, use_cache=True):
     """
     import sys
     sys.path.insert(0, '/home/admin/openclaw/workspace/tools')
-    from 数据缓存 import cache
+    try:
+        from 数据缓存 import cache
+    except ImportError:
+        cache = None
     
     cache_key = f"tencent_rank:{limit}"
     
     # 缓存检查
-    if use_cache:
+    if use_cache and cache is not None:
         cached = cache.get(cache_key)
         if cached and isinstance(cached, list) and len(cached) > 0:
             return cached
@@ -123,7 +137,7 @@ def get_realtime_rank(limit=100, use_cache=True):
         return []
     
     # 缓存 (2 分钟)
-    if use_cache:
+    if use_cache and cache is not None:
         cache.set(cache_key, stocks[:limit], ttl=120)
     
     return stocks[:limit]
