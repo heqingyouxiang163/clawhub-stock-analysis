@@ -1,0 +1,23 @@
+[Unit]
+Description=🦞 小龙虾·主板打板保活服务
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/openclaw/workspace/clawhub-stock-analysis
+ExecStart=/usr/bin/python3 /home/admin/openclaw/workspace/clawhub-stock-analysis/skills/小龙虾_保活版.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/admin/openclaw/workspace/temp/小龙虾服务日志.txt
+StandardError=append:/home/admin/openclaw/workspace/temp/小龙虾服务日志.txt
+
+# 环境变量
+Environment="PYTHONIOENCODING=utf-8"
+
+# 资源限制
+LimitNOFILE=65535
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
