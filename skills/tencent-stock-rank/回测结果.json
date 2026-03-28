@@ -1,0 +1,21 @@
+{
+  "backtest_date": "2026-03-28 12:43",
+  "total_stocks": 81,
+  "current_weights": {
+    "avg_line": 40,
+    "limit_count": 25,
+    "tightening": 20,
+    "volume": 15
+  },
+  "optimized_weights": {
+    "avg_line": 35,
+    "limit_count": 30,
+    "tightening": 20,
+    "volume": 15
+  },
+  "win_rates": {
+    "high_score": 100.0,
+    "mid_score": 0,
+    "low_score": 0
+  }
+}
