@@ -28,6 +28,10 @@
     "stock-monitor-skill": {
       "version": "0.1.0",
       "installedAt": 1774419122868
+    },
+    "tushare-pro": {
+      "version": "1.0.0",
+      "installedAt": 1774690263454
     }
   }
 }
