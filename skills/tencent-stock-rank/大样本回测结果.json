@@ -1,0 +1,16 @@
+{
+  "total_stocks": 81,
+  "multi_limit_ratio": 53.086419753086425,
+  "groups": {
+    "4 连板+": 3,
+    "3 连板": 13,
+    "2 连板": 43,
+    "首板": 22
+  },
+  "optimized_weights": {
+    "avg_line": 30,
+    "limit_count": 35,
+    "tightening": 20,
+    "volume": 15
+  }
+}
