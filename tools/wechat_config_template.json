@@ -1,0 +1,25 @@
+{
+  "platform": "企业微信",
+  "webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY",
+  "serverchan_sendkey": "YOUR_SENDKEY",
+  
+  "推送设置": {
+    "早盘候选": true,
+    "打板推荐": true,
+    "盘中更新": false,
+    "收盘总结": true,
+    "复盘报告": true,
+    "策略升级": true,
+    "代码同步": false
+  },
+  
+  "推送时间": {
+    "09:25": "早盘候选",
+    "09:30": "打板推荐",
+    "11:30": "上午总结",
+    "15:00": "收盘总结",
+    "15:30": "复盘报告",
+    "20:00": "策略升级",
+    "22:00": "代码同步"
+  }
+}
