@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-03-30T11:39:04.461307",
+  "mode": {
+    "mode": "午间休市",
+    "description": "午间休市，使用盘中数据复盘上午",
+    "actions": [
+      "上午复盘",
+      "午后预案",
+      "选股池更新"
+    ]
+  },
+  "results": [
+    {
+      "code": "002692",
+      "name": "法尔胜",
+      "close": 5.81,
+      "change": -1.69,
+      "profit": -1515.0,
+      "profit_pct": -56.593201344788945,
+      "is_limit_up": "False"
+    },
+    {
+      "code": "000973",
+      "name": "佛塑科技",
+      "close": 18.98,
+      "change": -3.11,
+      "profit": 87.19999999999999,
+      "profit_pct": 2.3511647972389986,
+      "is_limit_up": "False"
+    },
+    {
+      "code": "002455",
+      "name": "百川股份",
+      "close": 14.76,
+      "change": 2.43,
+      "profit": 492.8999999999997,
+      "profit_pct": 12.525729968742844,
+      "is_limit_up": "False"
+    },
+    {
+      "code": "002151",
+      "name": "恒生科技",
+      "close": 37.68,
+      "change": 1.73,
+      "profit": 103804.4,
+      "profit_pct": 6107.578253706754,
+      "is_limit_up": "False"
+    }
+  ]
+}
