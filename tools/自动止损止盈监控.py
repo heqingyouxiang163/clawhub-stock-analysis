@@ -94,7 +94,7 @@ def check_holdings():
     for holding in HOLDINGS:
         code = holding['code']
         name = holding['name']
-        cost = holding['cost']
+        cost = holding.get('cost_price', holding.get('cost', 0))
         shares = holding.get('shares', 1000)
         
         data = get_stock_data(code)

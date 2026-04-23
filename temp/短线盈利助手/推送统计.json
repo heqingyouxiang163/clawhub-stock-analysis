@@ -184,8 +184,13 @@
       "time": "2026-03-27 10:30",
       "count": 0,
       "stocks": []
+    },
+    {
+      "time": "2026-04-23 09:00",
+      "count": 0,
+      "stocks": []
     }
   ],
-  "total_pushes": 37,
+  "total_pushes": 38,
   "total_stocks": 0
 }
